@@ -1,0 +1,58 @@
+# IntelliCannula - local development stack.
+#
+# Default runtime (chosen in Phase 1): run backend + ML natively via uv so that
+# torch can use Apple Silicon MPS, and use compose only for infrastructure.
+#
+#   docker compose up -d              -> postgres only
+#   docker compose --profile full up  -> postgres + backend + frontend
+#
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: intellicannula-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-intellicannula}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-intellicannula}
+      POSTGRES_DB: ${POSTGRES_DB:-intellicannula}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-intellicannula}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    profiles: ["full"]
+    build:
+      context: ./backend
+    container_name: intellicannula-backend
+    env_file: .env
+    environment:
+      # Inside the compose network postgres resolves by service name.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-intellicannula}:${POSTGRES_PASSWORD:-intellicannula}@postgres:5432/${POSTGRES_DB:-intellicannula}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+
+  frontend:
+    profiles: ["full"]
+    build:
+      context: ./frontend
+    container_name: intellicannula-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

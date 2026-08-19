@@ -1,0 +1,45 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+npm-debug.log*
+.eslintcache
+
+# --- Secrets ---
+.env
+.env.local
+
+# --- Model checkpoints & training artifacts ---
+*.pt
+*.pth
+*.onnx
+*.txt.model
+runs/
+wandb/
+lightning_logs/
+
+# --- Data (tracked by manifest, not by git) ---
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+vein_module/data/*
+vein_module/models/*
+infection_module/data/*
+infection_module/models/*
+!*/data/.gitkeep
+!*/models/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/
