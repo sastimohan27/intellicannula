@@ -5,10 +5,10 @@ downloadable; one requires an author request; one requires scraping.
 
 | Dataset | Modality | Access | Masks? | Module |
 |---|---|---|---|---|
-| CUBITAL | NIR | Public (Google Drive) | Yes | Pre-cannulation vein |
+| CUBITAL | NIR | Public, but **blocked on this network** | Yes | Pre-cannulation vein |
 | U-DAVIS | NIR | Request from authors | Yes | Pre-cannulation vein |
-| AZH Wound | RGB | Public (GitHub) | Type labels, no infection labels | Post-cannulation infection |
-| Medetec | RGB | Public (scrape) | Category labels only | Post-cannulation infection |
+| AZH Wound | RGB | ✅ Downloaded (930 images) | Type labels, no infection labels | Post-cannulation infection |
+| Medetec | RGB | ✅ Downloaded (full-size scrape) | Category labels only | Post-cannulation infection |
 
 ---
 
@@ -37,6 +37,39 @@ metric — no other dataset here provides it.
 segmenter (Phase 3). Version C matches our 512×512 target, so it is the default.
 Because there are two images per subject, splitting must be **subject-level**
 (Phase 2) or the same arm leaks across train and test.
+
+### ⛔ Download blocker on the current network
+
+`gdown` fails with `CERTIFICATE_VERIFY_FAILED: self-signed certificate in
+certificate chain`. The cause is not the script:
+
+```
+$ openssl s_client -connect drive.google.com:443
+ 0 s:CN=*.google.com
+   i:O=Fortinet, OU=Certificate Authority, CN=F2K60FTK22900019
+Verify return code: 19 (self-signed certificate in certificate chain)
+```
+
+A **Fortinet TLS-inspection appliance** re-signs Google Drive traffic. It does
+*not* intercept github.com or medetec.co.uk (both verify code 0), so this is a
+selective policy on cloud-file-sharing domains, and the Fortinet CA is not
+present in any readable keychain on this machine.
+
+Three ways forward, in order of preference:
+
+1. **Trust the CA properly.** Get the appliance's root certificate from
+   whoever administers the network, then point Python at a bundle containing
+   it: `export SSL_CERT_FILE=/path/to/bundle.pem`. `scripts/download_datasets.py`
+   already honours `SSL_CERT_FILE`.
+2. **Download off this network** — personal hotspot or a home connection — and
+   drop the folder at `data/raw/cubital/`.
+3. **Download via the browser**, which likely already trusts the Fortinet CA via
+   a managed profile, and unzip into `data/raw/cubital/`.
+
+Disabling certificate verification (`--no-check-certificate`) would defeat a
+security control the network administrator deliberately installed and would mean
+accepting dataset bytes from an unverified intermediary. Not done, and not
+recommended.
 
 ---
 
@@ -76,11 +109,32 @@ years at the AZH Wound and Vascular Center (Milwaukee, WI) with an iPad Pro and
 a Canon SX 620 HS, labelled by a wound specialist. Variable size: width
 320–700 px, height 240–525 px. JPG.
 
-**Label caveat that shapes Phase 5:** labels are **wound type** — venous,
-diabetic, pressure, surgical — **not infected/uninfected**. There is no
-ground-truth infection label in this dataset. Any `is_infected` column derived
-from it is a *proxy* label and must be documented as such in the Phase 5 model
-report, since it caps how much the reported precision/recall can be trusted.
+**Actual contents as downloaded** (`data/raw/azh/dataset/{Train,Test}.zip`,
+930 images across six single-letter class folders):
+
+| Folder | Class | Images |
+|---|---|---:|
+| `V` | venous | 247 |
+| `D` | diabetic | 185 |
+| `S` | surgical | 164 |
+| `P` | pressure | 134 |
+| `N` | **normal skin** | 100 |
+| `BG` | background | 100 |
+
+**Label caveat that shapes Phase 5:** labels are **wound type**, **not
+infected/uninfected**. There is no ground-truth infection label in this dataset.
+
+Better than expected, though: the `N` folder is *normal skin*, which gives a
+genuine negative class rather than forcing a wound-type-vs-wound-type proxy. The
+Phase 2 loader therefore maps wound classes {V, D, S, P} → `is_infected=1`,
+`N` → `0`, and drops `BG` entirely. What that target actually learns is **wound
+tissue vs intact skin**, which is weaker than "infected vs uninfected" but is
+the right first approximation for IntelliCannula: an IV site developing
+phlebitis moves from intact skin toward inflamed tissue. Every metric built on
+it must be reported as proxy-label performance.
+
+The class balance is roughly **7.3 : 1** positive-to-negative, so Phase 5 must
+weight classes or report balanced metrics — raw accuracy would be misleading.
 
 **Use in this project:** trains the colour + texture feature extractor and the
 LightGBM risk model (Phase 5). Its value is that it contains genuine
@@ -106,6 +160,18 @@ using it locally for model training is fine, re-hosting the images is not.
 gallery. Extravasation is an IV-infiltration injury — this is the closest
 publicly available imagery to the actual failure mode IntelliCannula monitors
 for, and is more on-target than any other data listed here.
+
+**Acquisition notes.** The gallery layout is
+`slide scans/<category>/{thumbnails,images}/<name>.jpg`, where `thumbnails/`
+holds ~6 KB previews and `images/` the ~20 KB full-size versions with the same
+stem. The downloader derives full-size URLs from thumbnail names rather than
+walking each `targetN.html` viewer page — one request per image instead of two,
+and it avoids a ~600-page breadth-first crawl. `slide scans dressings/` is
+skipped: those are product photographs of dressing materials, not wounds.
+
+Thumbnails are used only as a fallback. Their JPEG quantisation destroys exactly
+the fine colour and texture detail the Phase 5 features measure, so training on
+them would quietly degrade the feature extractor.
 
 **Use in this project:** held out as an **external generalization test set**
 (`data/processed/infection/medetec_external_test/`), never mixed into the AZH
