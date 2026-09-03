@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv .venv --python 3.12
+        working-directory: backend
+      - run: uv pip install --python .venv -r requirements.txt
+        working-directory: backend
+      - run: .venv/bin/python -m pytest -q
+        working-directory: backend
+
+  modules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      # lightgbm links against the OpenMP runtime, which is not preinstalled.
+      - run: sudo apt-get update && sudo apt-get install -y libgomp1 libgl1 libglib2.0-0
+      - run: uv venv .venv --python 3.12
+      - run: uv pip install --python .venv -r infection_module/requirements.txt
+      # The vein tests need scikit-image and albumentations on top of the
+      # infection env; torch is already present via ultralytics, so this is a
+      # small delta rather than a second multi-GB install.
+      - run: uv pip install --python .venv scikit-image==0.25.0 albumentations==1.4.24 scipy==1.14.1
+      - run: .venv/bin/python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx tsc --noEmit
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend

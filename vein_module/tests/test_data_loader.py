@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from vein_module.src.data_loader import (
+    VeinSegmentationDataset,
     _binarize,
     _split_subjects,
     parse_subject_id,
@@ -153,3 +154,40 @@ class TestPrepareVeinDataset:
     def test_raises_when_no_data_present(self, tmp_path):
         with pytest.raises(RuntimeError, match="no samples found"):
             prepare_vein_dataset(tmp_path / "a", tmp_path / "b", tmp_path / "out")
+
+
+class TestVeinSegmentationDataset:
+    """The class Phase 3 trains against."""
+
+    @pytest.fixture
+    def prepared(self, fake_cubital, tmp_path):
+        out = tmp_path / "processed"
+        prepare_vein_dataset(fake_cubital, tmp_path / "missing", out, image_size=64)
+        return out
+
+    def test_returns_chw_float_image_and_1hw_mask(self, prepared):
+        image, mask = VeinSegmentationDataset(prepared, "train", image_size=64)[0]
+        assert image.shape == (3, 64, 64)
+        assert mask.shape == (1, 64, 64)
+        assert image.dtype == np.float32 and mask.dtype == np.float32
+
+    def test_image_scaled_to_unit_range(self, prepared):
+        image, _ = VeinSegmentationDataset(prepared, "train", image_size=64)[0]
+        assert 0.0 <= image.min() and image.max() <= 1.0
+
+    def test_mask_is_strictly_binary(self, prepared):
+        """A soft mask would silently corrupt the Dice term in the Phase 3 loss."""
+        _, mask = VeinSegmentationDataset(prepared, "train", image_size=64)[0]
+        assert set(np.unique(mask)) <= {0.0, 1.0}
+
+    def test_pairs_matched_by_stem_not_by_order(self, prepared):
+        ds = VeinSegmentationDataset(prepared, "train", image_size=64)
+        assert all(img.stem == msk.stem for img, msk in ds.pairs)
+
+    def test_missing_split_gives_actionable_error(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="--prepare"):
+            VeinSegmentationDataset(tmp_path, "train")
+
+    def test_length_matches_pair_count(self, prepared):
+        ds = VeinSegmentationDataset(prepared, "train", image_size=64)
+        assert len(ds) == len(ds.pairs) > 0

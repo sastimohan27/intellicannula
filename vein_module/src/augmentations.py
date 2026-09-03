@@ -6,9 +6,16 @@ metrics stay comparable across runs.
 
 from __future__ import annotations
 
-import albumentations as A
-import cv2
-import numpy as np
+import os
+
+# Albumentations phones home for a version check at import time. A clinical
+# tool should not make an unannounced network call on import, and behind a
+# TLS-inspecting firewall it emits an SSL warning on every run.
+os.environ.setdefault("NO_ALBUMENTATIONS_UPDATE", "1")
+
+import albumentations as A  # noqa: E402
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
 
 IMAGE_SIZE = 512
 

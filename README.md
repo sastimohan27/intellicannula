@@ -86,11 +86,20 @@ cd frontend && npm run dev    # http://localhost:3000
 ### 4. ML modules (per-module venvs — torch is heavy, keep it out of the API env)
 
 ```bash
+brew install libomp        # lightgbm links against the OpenMP runtime
+
 uv venv vein_module/.venv --python 3.12
 uv pip install --python vein_module/.venv -r vein_module/requirements.txt
 
 uv venv infection_module/.venv --python 3.12
 uv pip install --python infection_module/.venv -r infection_module/requirements.txt
+```
+
+### Tests
+
+```bash
+infection_module/.venv/bin/python -m pytest -q   # module tests (47)
+cd backend && .venv/bin/python -m pytest -q      # API tests (2)
 ```
 
 ### Full containerised stack (deployment parity check)
@@ -103,23 +112,52 @@ docker compose --profile full up --build
 
 ## Data
 
+### Download
+
 ```bash
-python scripts/download_datasets.py --dataset all
+python scripts/download_datasets.py --dataset azh       # git clone, ~58 MB
+python scripts/download_datasets.py --dataset medetec   # full-size gallery scrape
+python scripts/download_datasets.py --dataset cubital   # needs `uv tool install gdown`
 ```
 
-Fetches CUBITAL (Google Drive, needs `gdown`), AZH (git clone), and Medetec
-(scrape). U-DAVIS has no public mirror and must be requested from its authors.
-Full detail, licensing caveats, and label caveats: [`docs/dataset_sources.md`](docs/dataset_sources.md).
+| Dataset | Status |
+|---|---|
+| AZH | ✅ 930 images, 6 classes |
+| Medetec | ✅ full-size wound galleries |
+| CUBITAL | ⛔ blocked by a Fortinet TLS-inspection appliance on this network |
+| U-DAVIS | ⚠️ no public mirror — request from the authors |
+
+The CUBITAL blocker and the three ways around it are documented in
+[`docs/dataset_sources.md`](docs/dataset_sources.md). The script honours
+`SSL_CERT_FILE` if you have the appliance's CA.
+
+### Prepare
+
+```bash
+python infection_module/src/data_loader.py --prepare
+python vein_module/src/data_loader.py --prepare      # once CUBITAL is present
+python scripts/data_report.py                        # -> docs/data_report.md
+```
 
 `data/raw/` and `data/processed/` are git-ignored — reproducibility comes from
-the split manifest written in Phase 2, not from committing images.
+the `split_manifest.json` each preparer writes, not from committing images.
+
+### Label honesty
+
+No public dataset labels a wound as infected. The infection module's
+`is_infected` target is a **proxy**: AZH wound classes → 1, normal skin → 0,
+background dropped. It learns *wound tissue vs intact skin*. Every metric built
+on it is reported as proxy-label performance, and the caveat is written into
+`split_manifest.json` so it travels with the data.
 
 ---
 
 ## Project status
 
-- [x] **Phase 1** — Scaffolding: repo structure, envs, compose, CI-ready smoke test
-- [ ] **Phase 2** — Data pipeline: subject-level splits, augmentation, data report
+- [x] **Phase 1** — Scaffolding: repo structure, envs, compose, CI smoke test
+- [x] **Phase 2** — Data pipeline: subject-level splits, augmentation, data report
+      *(infection side complete on real data; vein side written and unit-tested
+      but unrun — CUBITAL download is blocked, see below)*
 - [ ] **Phase 3** — Vein module: Attention U-Net, site selector, angle heuristic
 - [ ] **Phase 4** — Cannula detection: YOLOv11 on hand-labelled hub images
 - [ ] **Phase 5** — Infection monitoring: registration, features, risk model, tracker
