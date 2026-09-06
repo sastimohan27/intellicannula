@@ -1,0 +1,12 @@
+# YOLOv11 dataset config for cannula hub detection.
+#
+# Paths are relative to this file. Populate the split directories with the
+# labelled export described in docs/labeling_guide.md before training.
+path: ../../data/cannula
+train: train/images
+val: val/images
+test: test/images
+
+nc: 1
+names:
+  0: cannula_hub

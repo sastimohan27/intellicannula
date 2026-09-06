@@ -59,6 +59,21 @@ AZH_CLASS_NAMES = {
 }
 
 # Wound classes that map to the positive proxy label. See module docstring.
+def wound_group_id(class_name: str, filename: str) -> str:
+    """Identify the source wound a file came from.
+
+    AZH ships multiple ROI crops of one wound as `<id>_0.jpg`, `<id>_1.jpg`,
+    ... - venous alone has 173 files but only 118 distinct wounds. Splitting at
+    the file level puts crops of the same wound in both train and test, which
+    inflates every metric: a 5-fold CV run that way scored F1 0.99, and it was
+    measuring memorisation, not generalisation.
+
+    The class name is included because ids restart per class - `1.jpg` in
+    normal and `1_0.jpg` in venous are unrelated wounds.
+    """
+    return f"{class_name}/{Path(filename).stem.split('_')[0]}"
+
+
 WOUND_CLASSES = {"diabetic", "pressure", "venous", "surgical"}
 HEALTHY_CLASSES = {"normal"}
 EXCLUDED_CLASSES = {"background"}
@@ -245,26 +260,34 @@ def _collect_medetec(medetec_dir: Path) -> dict[str, list[Path]]:
 
 
 def _stratified_split(
-    paths: list[Path], val_frac: float, test_frac: float, rng: random.Random
+    paths: list[Path], val_frac: float, test_frac: float, rng: random.Random,
+    class_name: str = "",
 ) -> dict[str, list[Path]]:
-    """Split one class's images into train/val/test.
+    """Split one class's images into train/val/test, grouped by source wound.
 
-    Called per class, so the overall split is stratified by construction.
-    AZH has no subject IDs in filenames, so this is necessarily image-level -
-    unlike the vein module, which splits by subject. Flagged as a limitation:
-    if two photos of the same wound exist, they may straddle the split.
+    Called per class, so the overall split is stratified by construction. Within
+    a class the unit of assignment is the *wound*, not the file, so every ROI
+    crop of one wound lands in the same split. See `wound_group_id`.
     """
-    shuffled = sorted(paths)
-    rng.shuffle(shuffled)
+    groups: dict[str, list[Path]] = defaultdict(list)
+    for path in sorted(paths):
+        groups[wound_group_id(class_name, path.name)].append(path)
 
-    n = len(shuffled)
+    group_ids = sorted(groups)
+    rng.shuffle(group_ids)
+
+    n = len(group_ids)
     n_test = int(round(n * test_frac))
     n_val = int(round(n * val_frac))
 
+    assignment = {
+        "test": group_ids[:n_test],
+        "val": group_ids[n_test : n_test + n_val],
+        "train": group_ids[n_test + n_val :],
+    }
     return {
-        "test": shuffled[:n_test],
-        "val": shuffled[n_test : n_test + n_val],
-        "train": shuffled[n_test + n_val :],
+        split: [path for gid in ids for path in groups[gid]]
+        for split, ids in assignment.items()
     }
 
 
@@ -298,7 +321,7 @@ def prepare_infection_dataset(
             log.info("dropping %d '%s' images (neither wound nor skin)", len(paths), class_name)
             continue
 
-        splits = _stratified_split(paths, val_frac, test_frac, rng)
+        splits = _stratified_split(paths, val_frac, test_frac, rng, class_name)
         for split, split_paths in splits.items():
             dest_dir = output_dir / split / class_name
             dest_dir.mkdir(parents=True, exist_ok=True)
@@ -334,10 +357,12 @@ def prepare_infection_dataset(
         "seed": seed,
         "val_frac": val_frac,
         "test_frac": test_frac,
-        "split_level": "image",
+        "split_level": "wound_group",
         "split_level_caveat": (
-            "AZH filenames carry no subject IDs, so this split is image-level. "
-            "Repeat photographs of one wound may straddle splits."
+            "Split by source wound, not by file: AZH ships multiple ROI crops of "
+            "one wound as <id>_0, <id>_1, so a file-level split leaks the same "
+            "wound across train and test. No patient IDs are published, so two "
+            "wounds on the same patient may still straddle splits."
         ),
         "label_provenance": (
             "PROXY labels. AZH provides wound type, not infection status. "

@@ -9,6 +9,9 @@ Two invariants matter most here:
 
 import json
 
+import random
+from pathlib import Path
+
 import cv2
 import numpy as np
 import pytest
@@ -19,14 +22,16 @@ from infection_module.src.data_loader import (
     WoundClassificationDataset,
     _stratified_split,
     prepare_infection_dataset,
+    wound_group_id,
 )
 
 
 def _write_images(directory, n, prefix="img"):
+    """Write n images named `<prefix><id>_0.png` - one crop per distinct wound."""
     directory.mkdir(parents=True, exist_ok=True)
     for i in range(n):
         img = np.random.randint(0, 255, (32, 32, 3), dtype=np.uint8)
-        cv2.imwrite(str(directory / f"{prefix}_{i:03d}.png"), img)
+        cv2.imwrite(str(directory / f"{prefix}{i:03d}_0.png"), img)
 
 
 @pytest.fixture
@@ -35,7 +40,8 @@ def fake_azh(tmp_path):
     root = tmp_path / "azh"
     for split, scale in (("Train", 1), ("Test", 0)):
         for cls, n in (("D", 20), ("P", 20), ("V", 20), ("S", 20), ("N", 20), ("BG", 20)):
-            _write_images(root / "dataset" / split / cls, n if scale else 4, prefix=f"{split}{cls}")
+            # AZH-style: <wound id>_<crop>. Distinct ids so grouping still splits.
+            _write_images(root / "dataset" / split / cls, n if scale else 8, prefix=split)
     return root
 
 
@@ -48,24 +54,46 @@ def fake_medetec(tmp_path):
 
 
 class TestStratifiedSplit:
+    @staticmethod
+    def _paths(n, crops_per_wound=1):
+        """AZH-style names: <wound id>_<crop index>.jpg."""
+        return [
+            Path(f"{i}_{c}.jpg")
+            for i in range(n)
+            for c in range(crops_per_wound)
+        ]
+
     def test_all_images_accounted_for(self):
-        paths = [f"img{i}.png" for i in range(100)]
-        splits = _stratified_split(paths, 0.15, 0.15, __import__("random").Random(42))
+        splits = _stratified_split(self._paths(100), 0.15, 0.15, random.Random(42), "venous")
         assert sum(len(v) for v in splits.values()) == 100
 
     def test_no_image_in_two_splits(self):
-        paths = [f"img{i}.png" for i in range(100)]
-        splits = _stratified_split(paths, 0.15, 0.15, __import__("random").Random(42))
+        splits = _stratified_split(self._paths(100), 0.15, 0.15, random.Random(42), "venous")
         assert not (set(splits["train"]) & set(splits["val"]))
         assert not (set(splits["train"]) & set(splits["test"]))
         assert not (set(splits["val"]) & set(splits["test"]))
 
-    def test_fractions_respected(self):
-        paths = [f"img{i}.png" for i in range(100)]
-        splits = _stratified_split(paths, 0.15, 0.15, __import__("random").Random(42))
+    def test_fractions_respected_when_one_crop_per_wound(self):
+        splits = _stratified_split(self._paths(100), 0.15, 0.15, random.Random(42), "venous")
         assert len(splits["test"]) == 15
         assert len(splits["val"]) == 15
         assert len(splits["train"]) == 70
+
+    def test_all_crops_of_one_wound_land_in_the_same_split(self):
+        """The leak that made an ungrouped 5-fold CV score F1 0.99."""
+        splits = _stratified_split(
+            self._paths(40, crops_per_wound=3), 0.15, 0.15, random.Random(42), "venous"
+        )
+        location = {}
+        for split, paths in splits.items():
+            for path in paths:
+                wound = path.stem.split("_")[0]
+                location.setdefault(wound, set()).add(split)
+        assert all(len(s) == 1 for s in location.values())
+
+    def test_ids_do_not_collide_across_classes(self):
+        """`1.jpg` in normal and `1_0.jpg` in venous are unrelated wounds."""
+        assert wound_group_id("normal", "1.jpg") != wound_group_id("venous", "1_0.jpg")
 
 
 class TestPrepareInfectionDataset:
@@ -105,7 +133,7 @@ class TestPrepareInfectionDataset:
         prepare_infection_dataset(fake_azh, fake_medetec, out)
         manifest = json.loads((out / "split_manifest.json").read_text())
         assert "PROXY" in manifest["label_provenance"]
-        assert manifest["split_level"] == "image"
+        assert manifest["split_level"] == "wound_group"
 
     def test_missing_medetec_is_tolerated(self, fake_azh, tmp_path):
         counts = prepare_infection_dataset(fake_azh, tmp_path / "nope", tmp_path / "out")
