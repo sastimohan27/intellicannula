@@ -74,6 +74,30 @@ def wound_group_id(class_name: str, filename: str) -> str:
     return f"{class_name}/{Path(filename).stem.split('_')[0]}"
 
 
+# Medetec galleries kept as the external test set.
+#
+# The archive has 16 wound galleries totalling 610 images, but this project is
+# about IV cannulation, and almost none of them relate to it. Burns, meningitis
+# rash, malignant wounds, haemangioma, epidermolysis bullosa and pilonidal
+# sinus have no bearing on what happens at a cannula site, and including them
+# makes the "external generalization" number measure transfer to conditions the
+# system will never encounter.
+#
+# Extravasation is the exception and the reason this set is here at all: it is
+# an IV-infiltration injury - infusate leaking from the cannula into
+# surrounding tissue - which is exactly the failure mode IntelliCannula
+# monitors for. It is the closest public imagery to the target condition.
+MEDETEC_RELEVANT_CATEGORIES = {"extravasation-wound-images"}
+
+# Individually relevant images filed under otherwise-irrelevant galleries.
+# An infected insect bite is localised inflammation on *intact* skin, which is
+# visually much closer to early phlebitis than any open ulcer in the archive.
+MEDETEC_RELEVANT_FILES = {"infected-insect-bite"}
+
+# Gallery cover slides, not clinical images.
+MEDETEC_EXCLUDED_STEMS = {"introslide"}
+
+
 WOUND_CLASSES = {"diabetic", "pressure", "venous", "surgical"}
 HEALTHY_CLASSES = {"normal"}
 EXCLUDED_CLASSES = {"background"}
@@ -221,6 +245,7 @@ def _collect_medetec(medetec_dir: Path) -> dict[str, list[Path]]:
 
     full_size: dict[str, dict[str, Path]] = defaultdict(dict)
     thumbnails: dict[str, dict[str, Path]] = defaultdict(dict)
+    skipped_irrelevant = 0
 
     for path in gallery_root.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in IMAGE_SUFFIXES:
@@ -232,9 +257,27 @@ def _collect_medetec(medetec_dir: Path) -> dict[str, list[Path]]:
         if len(relative.parts) < 2:
             continue
 
+        if path.stem in MEDETEC_EXCLUDED_STEMS:
+            continue
+
         category = relative.parts[0].lower().replace(" ", "_")
+        relevant = (
+            relative.parts[0] in MEDETEC_RELEVANT_CATEGORIES
+            or path.stem in MEDETEC_RELEVANT_FILES
+        )
+        if not relevant:
+            skipped_irrelevant += 1
+            continue
+
         bucket = thumbnails if "thumbnails" in {p.lower() for p in relative.parts} else full_size
         bucket[category][path.stem] = path
+
+    if skipped_irrelevant:
+        log.info(
+            "skipped %d Medetec images from galleries unrelated to IV cannulation "
+            "(burns, meningitis, malignant wounds, ...)",
+            skipped_irrelevant,
+        )
 
     for category in sorted(set(full_size) | set(thumbnails)):
         chosen = dict(thumbnails.get(category, {}))

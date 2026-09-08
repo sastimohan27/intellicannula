@@ -48,7 +48,8 @@ def fake_azh(tmp_path):
 @pytest.fixture
 def fake_medetec(tmp_path):
     root = tmp_path / "medetec"
-    _write_images(root / "slide scans" / "extravasation", 10, prefix="extrav")
+    # Real gallery names: only IV-relevant ones survive the relevance filter.
+    _write_images(root / "slide scans" / "extravasation-wound-images", 10, prefix="extrav")
     _write_images(root / "slide scans" / "burns", 8, prefix="burn")
     return root
 
@@ -118,7 +119,17 @@ class TestPrepareInfectionDataset:
         """Extravasation is the closest public analogue to an IV-site injury."""
         out = tmp_path / "processed"
         counts = prepare_infection_dataset(fake_azh, fake_medetec, out)
-        assert "extravasation" in counts["medetec_external_test"]
+        assert "extravasation-wound-images" in counts["medetec_external_test"]
+
+    def test_galleries_unrelated_to_iv_cannulation_are_dropped(
+        self, fake_azh, fake_medetec, tmp_path
+    ):
+        """Burns, meningitis, malignant wounds etc. have no bearing on a cannula
+        site, and including them would make the external-generalization number
+        measure transfer to conditions the system will never encounter."""
+        out = tmp_path / "processed"
+        counts = prepare_infection_dataset(fake_azh, fake_medetec, out)
+        assert "burns" not in counts["medetec_external_test"]
 
     def test_stratified_across_classes(self, fake_azh, fake_medetec, tmp_path):
         out = tmp_path / "processed"

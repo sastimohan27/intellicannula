@@ -50,6 +50,20 @@ Average precision is reported alongside AUC deliberately. At roughly 7:1 imbalan
 | `texture_glcm_contrast_d1` | 33.0 |
 | `texture_glcm_correlation_d1` | 33.0 |
 
+## External test — Medetec extravasation (IV-infiltration injuries)
+
+**21 images.** Extravasation is infusate escaping a cannula into surrounding tissue — the closest public imagery to the failure mode this system targets. Different clinicians, cameras and decade from the training data.
+
+| Metric | Value |
+|---|---:|
+| Detection rate @0.5 | 100.0% |
+| Mean risk | 0.993 |
+| Median risk | 0.998 |
+| Range | 0.946 – 1.000 |
+
+Every image here is abnormal, so there is no negative class and precision is undefined — this is recall, not accuracy. The set is also small (n=20), so treat it as a sanity check that the model responds to real IV pathology, not as a performance estimate.
+
+
 ## Feature-group ablation — what is the model actually using?
 
 | Feature group | n | F1 | Avg precision |

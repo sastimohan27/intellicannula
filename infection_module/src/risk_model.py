@@ -275,8 +275,63 @@ def predict_risk(features: dict[str, float], model_path: Path | None = None) -> 
     return float(_booster_cache[key].predict(vector)[0])
 
 
+def evaluate_external(
+    processed_dir: Path, model_path: Path, split: str = "medetec_external_test"
+) -> dict:
+    """Score the model on the Medetec IV-relevant set.
+
+    This is the most on-topic evaluation available. Extravasation is an
+    IV-infiltration injury - infusate escaping the cannula into surrounding
+    tissue - so these 20 images are the closest public analogue to the failure
+    mode IntelliCannula exists to detect.
+
+    Every image here is abnormal, so there is no negative class and precision is
+    undefined. What can be measured is the **detection rate**: the fraction the
+    model flags at threshold 0.5. Read it as recall on genuinely IV-related
+    pathology, photographed by different clinicians with different cameras in a
+    different decade from the training data.
+    """
+    root = Path(processed_dir) / split
+    if not root.is_dir():
+        log.warning("no external test split at %s", root)
+        return {}
+
+    scores, names = [], []
+    for class_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for path in sorted(class_dir.iterdir()):
+            if path.suffix.lower() not in IMAGE_SUFFIXES:
+                continue
+            image = cv2.imread(str(path))
+            if image is None:
+                continue
+            try:
+                features = extract_all_features(image, _center_roi(image))
+            except ValueError:
+                continue
+            scores.append(predict_risk(features, model_path))
+            names.append(f"{class_dir.name}/{path.name}")
+
+    if not scores:
+        return {}
+
+    scores_arr = np.array(scores)
+    result = {
+        "n_images": len(scores),
+        "detection_rate": float((scores_arr >= 0.5).mean()),
+        "mean_risk": float(scores_arr.mean()),
+        "median_risk": float(np.median(scores_arr)),
+        "min_risk": float(scores_arr.min()),
+        "max_risk": float(scores_arr.max()),
+    }
+    log.info(
+        "external (%s): %d images, detection rate %.1f%%, mean risk %.3f",
+        split, result["n_images"], result["detection_rate"] * 100, result["mean_risk"],
+    )
+    return result
+
+
 def _write_report(cv: dict, table: pd.DataFrame, importances, path: Path,
-                  groups: dict | None = None) -> None:
+                  groups: dict | None = None, external: dict | None = None) -> None:
     lines = [
         "# Infection Risk Model — Report",
         "",
@@ -328,6 +383,30 @@ def _write_report(cv: dict, table: pd.DataFrame, importances, path: Path,
         "|---|---:|",
     ]
     lines += [f"| `{name}` | {value:.1f} |" for name, value in importances]
+    if external:
+        lines += [
+            "",
+            "## External test — Medetec extravasation (IV-infiltration injuries)",
+            "",
+            f"**{external['n_images']} images.** Extravasation is infusate escaping "
+            "a cannula into surrounding tissue — the closest public imagery to the "
+            "failure mode this system targets. Different clinicians, cameras and "
+            "decade from the training data.",
+            "",
+            "| Metric | Value |",
+            "|---|---:|",
+            f"| Detection rate @0.5 | {external['detection_rate'] * 100:.1f}% |",
+            f"| Mean risk | {external['mean_risk']:.3f} |",
+            f"| Median risk | {external['median_risk']:.3f} |",
+            f"| Range | {external['min_risk']:.3f} – {external['max_risk']:.3f} |",
+            "",
+            "Every image here is abnormal, so there is no negative class and "
+            "precision is undefined — this is recall, not accuracy. The set is "
+            "also small (n=20), so treat it as a sanity check that the model "
+            "responds to real IV pathology, not as a performance estimate.",
+            "",
+        ]
+
     if groups:
         lines += [
             "",
@@ -399,6 +478,7 @@ def main() -> None:
     cv = cross_validate(table, seed=args.seed)
     groups = ablation(table, seed=args.seed)
     model = train_final(table, Path(args.model_path), seed=args.seed)
+    external = evaluate_external(Path(args.processed_dir), Path(args.model_path))
 
     importances = sorted(
         zip(feature_names(), model.booster_.feature_importance("gain")),
@@ -406,7 +486,7 @@ def main() -> None:
     )[:12]
 
     Path(args.report).parent.mkdir(parents=True, exist_ok=True)
-    _write_report(cv, table, importances, Path(args.report), groups)
+    _write_report(cv, table, importances, Path(args.report), groups, external)
 
     for name, stats in cv.items():
         print(f"{name:>15}: {stats['mean']:.4f} ± {stats['std']:.4f}")

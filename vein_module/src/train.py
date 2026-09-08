@@ -17,6 +17,7 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+import cv2
 import numpy as np
 import torch
 import torch.nn as nn
@@ -81,12 +82,62 @@ class DiceLoss(nn.Module):
         return 1.0 - (numerator / denominator).mean()
 
 
-class CombinedLoss(nn.Module):
-    """0.5 * BCEWithLogits + 0.5 * Dice."""
+def estimate_pos_weight(data_dir: Path, split: str = "train", cap: bool = True) -> float:
+    """Positive-class weight for BCE, measured from the masks.
 
-    def __init__(self, bce_weight: float = 0.5):
+    Vein pixels are 0.358% of a CUBITAL frame - a 278:1 negative-to-positive
+    ratio. Unweighted BCE is minimised almost perfectly by predicting background
+    everywhere, and that is exactly what the network did: at epochs 1, 3 and 4 of
+    the first run, val Dice and IoU were *identical* at 0.0559, which can only
+    happen when true positives are zero. The non-zero value came entirely from
+    empty masks scoring 1.0.
+
+    Using the raw 278:1 ratio overcorrects and floods the prediction with false
+    positives, so this returns sqrt(ratio) (~16.7 here) by default. That is a
+    standard softening: strong enough to make the positive class matter, mild
+    enough not to invert the problem. Pass cap=False for the raw ratio.
+    """
+    mask_dir = Path(data_dir) / split / "masks"
+    positive = total = 0
+    for path in sorted(mask_dir.glob("*.png")):
+        mask = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        if mask is None:
+            continue
+        positive += int((mask > 127).sum())
+        total += mask.size
+
+    if positive == 0:
+        log.warning("no positive pixels found in %s - using pos_weight 1.0", mask_dir)
+        return 1.0
+
+    fraction = positive / total
+    ratio = (1.0 - fraction) / fraction
+    weight = float(np.sqrt(ratio)) if cap else float(ratio)
+    log.info(
+        "positive pixels %.4f%% (neg/pos %.1f) -> pos_weight %.1f",
+        fraction * 100, ratio, weight,
+    )
+    return weight
+
+
+class CombinedLoss(nn.Module):
+    """Weighted BCEWithLogits + Dice.
+
+    Defaults are Dice-dominant (0.3 / 0.7). Dice is scale-invariant to class
+    imbalance, so it keeps pulling toward overlap while BCE - even weighted -
+    still rewards the all-background solution. The first training run used an
+    even 0.5/0.5 split with no pos_weight and collapsed; both changes address
+    the same 278:1 imbalance from different directions.
+    """
+
+    def __init__(self, bce_weight: float = 0.3, pos_weight: float | None = None):
         super().__init__()
-        self.bce = nn.BCEWithLogitsLoss()
+        weight_tensor = (
+            torch.tensor([pos_weight], dtype=torch.float32)
+            if pos_weight is not None
+            else None
+        )
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=weight_tensor)
         self.dice = DiceLoss()
         self.bce_weight = bce_weight
 
@@ -120,7 +171,8 @@ class TrainConfig:
     weight_decay: float = 1e-5
     image_size: int = 512
     base_channels: int = 32
-    bce_weight: float = 0.5
+    bce_weight: float = 0.3
+    pos_weight: float | None = None      # None -> measured from the training masks
     patience: int = 15
     seed: int = 42
     num_workers: int = 4
@@ -194,7 +246,12 @@ def train(
     model = AttentionUNet(base_channels=config.base_channels).to(device)
     log.info("parameters: %s", f"{count_parameters(model):,}")
 
-    criterion = CombinedLoss(config.bce_weight)
+    pos_weight = (
+        config.pos_weight
+        if config.pos_weight is not None
+        else estimate_pos_weight(data_dir)
+    )
+    criterion = CombinedLoss(config.bce_weight, pos_weight).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
     )
@@ -269,6 +326,7 @@ def train(
 
     summary = {
         **asdict(config),
+        "pos_weight_used": pos_weight,
         "best_val_dice": best_dice,
         "best_epoch": best_epoch,
         "epochs_run": epoch,
@@ -294,6 +352,11 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--image-size", type=int, default=512)
     parser.add_argument("--patience", type=int, default=15)
+    parser.add_argument("--bce-weight", type=float, default=0.3)
+    parser.add_argument(
+        "--pos-weight", type=float, default=None,
+        help="BCE positive-class weight; omit to measure it from the masks",
+    )
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda", "mps"])
     args = parser.parse_args()
@@ -304,6 +367,8 @@ def main() -> None:
         learning_rate=args.lr,
         image_size=args.image_size,
         patience=args.patience,
+        bce_weight=args.bce_weight,
+        pos_weight=args.pos_weight,
         num_workers=args.num_workers,
         device=args.device,
     )
