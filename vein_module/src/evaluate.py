@@ -285,8 +285,35 @@ def _write_report(summary: dict, path: Path) -> None:
     lines += [f"![example {i}](figures/{name})" for i, name in enumerate(summary["examples"])]
     lines += [
         "",
+        "## Known failure: predictions land off the patient",
+        "",
+        "The overlays show vein-shaped false positives on the **bedsheet**, and "
+        "on some images the selected insertion site is placed off the arm "
+        "entirely. That is the direct cause of the precision/recall split above "
+        "(recall high, precision low): the network over-predicts, and creased "
+        "linen produces exactly the elongated ridge structure both the Frangi "
+        "channel and the network are tuned to find.",
+        "",
+        "**A site marker on a bedsheet is a clinically unacceptable output**, "
+        "not a cosmetic issue, and it is not fixed by thresholding.",
+        "",
+        "The fix is already available in the data and was discarded. CUBITAL "
+        "masks are three-class — `0` background, `1` arm, `2` vein — and the "
+        "loader keeps only class 2. Training the network to predict the arm as "
+        "well, then intersecting the vein prediction with it, constrains "
+        "candidates to the limb for free. That is the top priority for the next "
+        "training run.",
+        "",
         "## Limitations",
         "",
+        "- **Under-trained.** This checkpoint is from epoch 6 of a planned 25. "
+        "Validation Dice was still climbing monotonically when the run was "
+        "stopped (0.133 → 0.179 → 0.204 → 0.217 → 0.240 → 0.353), so these "
+        "numbers are a lower bound, not a converged result.",
+        "- **Paediatric cohort.** CUBITAL is 1,008 subjects aged 5–22 (median "
+        "11), 97% recorded as slim, 42 obese. The clinical need is in elderly "
+        "and obese adults, where veins are harder to find. Transfer to that "
+        "population is untested and should not be assumed.",
         "- Trained on NIR imagery. Deploying against an RGB camera is a domain "
         "shift this number does not measure.",
         "- The needle-angle output is a heuristic proxy for depth, not a "
