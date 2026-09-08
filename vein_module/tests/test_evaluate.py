@@ -131,3 +131,34 @@ class TestEvaluateRoundTrip:
         report = (tmp_path / "docs" / "vein_module_eval_report.md").read_text()
         assert "Not computed" in report
         assert "Limitations" in report
+
+
+class TestEmptyMaskAccounting:
+    """An image with no annotated vein must not inflate the headline score.
+
+    Vein pixels are ~0.45% of a CUBITAL frame, so predicting background
+    everywhere is a strong local minimum. If empty masks are averaged into the
+    headline, a fully collapsed model reports Dice ~0.05 instead of 0.0 - which
+    reads as weak learning rather than no learning. These tests pin the split.
+    """
+
+    def test_headline_excludes_empty_masks(self, trained):
+        processed, checkpoint, tmp_path = trained
+        summary = evaluate(
+            checkpoint, processed, tmp_path / "docs", tmp_path / "docs" / "figures"
+        )
+        assert summary["n_with_vein"] + summary["n_without_vein"] == summary["n_test_images"]
+
+    def test_collapse_diagnostic_is_reported(self, trained):
+        processed, checkpoint, tmp_path = trained
+        summary = evaluate(
+            checkpoint, processed, tmp_path / "docs", tmp_path / "docs" / "figures"
+        )
+        assert 0.0 <= summary["collapsed_to_background"] <= 1.0
+
+    def test_report_names_the_collapse_check(self, trained):
+        processed, checkpoint, tmp_path = trained
+        evaluate(checkpoint, processed, tmp_path / "docs", tmp_path / "docs" / "figures")
+        report = (tmp_path / "docs" / "vein_module_eval_report.md").read_text()
+        assert "entirely background" in report
+        assert "0.45%" in report

@@ -136,6 +136,8 @@ def evaluate(
 
             metrics["stem"] = stem
             metrics["site_found"] = site["x"] is not None
+            metrics["target_empty"] = bool(target.sum() == 0)
+            metrics["pred_empty"] = bool(pred.sum() == 0)
             per_image.append(metrics)
 
             if len(saved_examples) < n_examples:
@@ -145,17 +147,43 @@ def evaluate(
                 cv2.imwrite(str(path), overlay(bgr, pred, site, truth))
                 saved_examples.append(path.name)
 
-    def mean(key):
-        values = [m[key] for m in per_image if key in m]
+    def mean(key, subset=None):
+        source = per_image if subset is None else subset
+        values = [m[key] for m in source if key in m]
         return float(np.mean(values)) if values else 0.0
+
+    # Split empty-target images out of the headline metric.
+    #
+    # An image with no annotated vein, where the model also predicts nothing,
+    # scores a perfect Dice of 1.0. That is arguably correct behaviour, but
+    # averaging it into the headline number does two bad things: it inflates the
+    # score by the empty-mask fraction (4.6% of the CUBITAL test split), and it
+    # *hides total collapse* - a model predicting background everywhere still
+    # reports Dice 0.046 rather than 0.0, which looks like weak learning instead
+    # of no learning. Both numbers are reported.
+    with_vein = [m for m in per_image if not m["target_empty"]]
+    without_vein = [m for m in per_image if m["target_empty"]]
 
     summary = {
         "n_test_images": len(per_image),
         "threshold": threshold,
-        "dice": mean("dice"),
-        "iou": mean("iou"),
-        "precision": mean("precision"),
-        "recall": mean("recall"),
+        # Headline numbers: images that actually contain a vein.
+        "n_with_vein": len(with_vein),
+        "dice": mean("dice", with_vein),
+        "iou": mean("iou", with_vein),
+        "precision": mean("precision", with_vein),
+        "recall": mean("recall", with_vein),
+        # Same metrics over every image, for comparison with papers that do not
+        # separate the two.
+        "dice_all_images": mean("dice"),
+        "iou_all_images": mean("iou"),
+        # Empty-target images, scored as a correct-rejection rate instead.
+        "n_without_vein": len(without_vein),
+        "empty_correctly_rejected": (
+            float(np.mean([m["pred_empty"] for m in without_vein]))
+            if without_vein else 0.0
+        ),
+        "collapsed_to_background": float(np.mean([m["pred_empty"] for m in per_image])),
         "site_found_rate": float(np.mean([m["site_found"] for m in per_image])),
         "mean_confidence": float(np.mean(confidences)) if confidences else 0.0,
         "checkpoint": str(checkpoint_path),
@@ -190,12 +218,29 @@ def _write_report(summary: dict, path: Path) -> None:
         "",
         "## Segmentation",
         "",
+        f"Scored over the **{summary['n_with_vein']} test images that contain an "
+        f"annotated vein**. The other {summary['n_without_vein']} have empty "
+        "masks and are reported separately below — averaging them into the "
+        "headline would inflate it and could hide a model that predicts nothing.",
+        "",
         "| Metric | Value |",
         "|---|---:|",
         f"| Dice | {summary['dice']:.4f} |",
         f"| IoU | {summary['iou']:.4f} |",
         f"| Precision | {summary['precision']:.4f} |",
         f"| Recall | {summary['recall']:.4f} |",
+        "",
+        "| Diagnostic | Value |",
+        "|---|---:|",
+        f"| Dice incl. empty-mask images | {summary['dice_all_images']:.4f} |",
+        f"| Empty masks correctly left blank | {summary['empty_correctly_rejected'] * 100:.0f}% |",
+        f"| Images predicted entirely background | "
+        f"{summary['collapsed_to_background'] * 100:.0f}% |",
+        "",
+        "A high value in that last row means the network collapsed to the "
+        "majority class. Vein pixels are only ~0.45% of a CUBITAL frame, so "
+        "predicting background everywhere is a strong local minimum — it is the "
+        "first failure to check for, not a rounding detail.",
         "",
         "## Insertion site selection",
         "",

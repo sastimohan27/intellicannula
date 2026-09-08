@@ -163,6 +163,52 @@ def _binarize(mask: np.ndarray, source: str) -> np.ndarray:
     return (mask > BINARY_THRESHOLD).astype(np.uint8) * 255
 
 
+def _load_cubital_manifest(root: Path) -> list[Sample] | None:
+    """Load CUBITAL from its dataset.csv, which is the only source of subject IDs.
+
+    The 512x512 release names files by a bare row index - `nir_images/0.png`,
+    `masks/0.png` - so nothing in the filename identifies the person. Falling
+    back to filename parsing would treat all 2,016 images as 2,016 separate
+    subjects and quietly degrade the subject-level split to an image-level one,
+    putting a person's left arm in train and their right arm in test.
+
+    dataset.csv carries `person_id` (M0001, ...), and exactly 2 rows share each
+    of the 1,008 ids - one per arm. It also carries age, complexion, gender and
+    the antecubital fossa box, which the data report uses.
+
+    Returns None if the CSV is absent, so a differently-packaged copy of the
+    dataset still works through the directory-scanning path.
+    """
+    manifest = next(root.rglob("dataset.csv"), None)
+    if manifest is None:
+        return None
+
+    import csv as _csv
+
+    base = manifest.parent
+    samples: list[Sample] = []
+    with manifest.open(newline="") as handle:
+        for row in _csv.DictReader(handle):
+            image = base / row["nir_image"]
+            mask = base / row["mask"]
+            if image.is_file() and mask.is_file():
+                samples.append(
+                    Sample(
+                        image=image,
+                        mask=mask,
+                        subject=f"cubital_{row['person_id']}",
+                        source="cubital",
+                    )
+                )
+
+    n_subjects = len({s.subject for s in samples})
+    log.info(
+        "cubital: %d samples from %d subjects (via %s)",
+        len(samples), n_subjects, manifest,
+    )
+    return samples
+
+
 def _find_pairs(root: Path, source: str) -> list[Sample]:
     """Locate image/mask pairs under a raw dataset directory.
 
@@ -172,6 +218,11 @@ def _find_pairs(root: Path, source: str) -> list[Sample]:
     if not root.is_dir():
         log.warning("%s directory %s not found, skipping", source, root)
         return []
+
+    if source == "cubital":
+        from_manifest = _load_cubital_manifest(root)
+        if from_manifest is not None:
+            return from_manifest
 
     mask_files: dict[str, Path] = {}
     image_files: dict[str, Path] = {}
