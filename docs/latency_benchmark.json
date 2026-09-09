@@ -1,0 +1,22 @@
+[
+  {
+    "pipeline": "vein-scan",
+    "device": "cpu",
+    "runs": 10,
+    "mean_ms": 653.7,
+    "median_ms": 649.9,
+    "p95_ms": 667.0,
+    "min_ms": 648.0,
+    "max_ms": 667.0
+  },
+  {
+    "pipeline": "site-check",
+    "device": "cpu",
+    "runs": 10,
+    "mean_ms": 6.9,
+    "median_ms": 1.3,
+    "p95_ms": 57.4,
+    "min_ms": 1.2,
+    "max_ms": 57.4
+  }
+]

@@ -154,16 +154,35 @@ on it is reported as proxy-label performance, and the caveat is written into
 
 ## Project status
 
-- [x] **Phase 1** — Scaffolding: repo structure, envs, compose, CI smoke test
+- [x] **Phase 1** — Scaffolding: repo structure, envs, compose, CI
 - [x] **Phase 2** — Data pipeline: subject-level splits, augmentation, data report
-      *(infection side complete on real data; vein side written and unit-tested
-      but unrun — CUBITAL download is blocked, see below)*
-- [ ] **Phase 3** — Vein module: Attention U-Net, site selector, angle heuristic
-- [ ] **Phase 4** — Cannula detection: YOLOv11 on hand-labelled hub images
-- [ ] **Phase 5** — Infection monitoring: registration, features, risk model, tracker
-- [ ] **Phase 6** — Backend API + dashboard integration
-- [ ] **Phase 7** — Evaluation & validation
-- [ ] **Phase 8** — Deployment: ONNX export, audit logging, deployment checklist
+- [x] **Phase 3** — Vein module: Attention U-Net (7.85M params), trained on
+      CUBITAL. Test Dice 0.3698 — under-trained, see limitations
+- [ ] **Phase 4** — Cannula detection: scaffolded; blocked on ~100–200
+      hand-labelled images that do not exist publicly
+- [x] **Phase 5** — Infection monitoring: registration, 30 features, LightGBM
+      risk model, temporal tracker
+- [x] **Phase 6** — Backend API + clinician dashboard, verified end to end
+- [x] **Phase 7** — Evaluation: [`full_system_eval.md`](docs/full_system_eval.md),
+      latency benchmark
+- [x] **Phase 8** — ONNX export with parity check, audit logging, deployment
+      checklist
+
+### Results at a glance
+
+| Component | Metric | Value |
+|---|---|---|
+| Vein segmentation | Dice / IoU (test) | 0.3698 / 0.2390 |
+| Infection risk | F1 (5-fold, grouped) | 0.9885 — **proxy labels** |
+| Infection risk | External detection (extravasation) | 100% (n=21) |
+| Latency | vein-scan / site-check | 654 ms / 7 ms |
+| ONNX parity | max abs difference | 6.6e-06 |
+| Tests | module + API | 157 + 29 |
+
+Read [`docs/full_system_eval.md`](docs/full_system_eval.md) before quoting any
+of these. The infection F1 is a proxy-label number that an ablation shows is
+driven by colour heterogeneity rather than erythema, and the vein model has a
+known failure where it can mark an insertion point off the patient.
 
 ## Known gaps
 
