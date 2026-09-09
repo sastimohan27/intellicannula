@@ -43,3 +43,7 @@ infection_module/models/*
 .DS_Store
 .vscode/
 .idea/
+
+# --- Local API artifacts ---
+backend/*.db
+data/uploads/

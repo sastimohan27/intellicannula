@@ -26,6 +26,21 @@ class Settings(BaseSettings):
     # Where trained checkpoints live. Read by the vein / infection modules.
     model_weights_dir: Path = Path("models")
 
+    # Local image store, used when S3 is not configured so the stack runs with
+    # no cloud account.
+    local_storage_dir: Path = Path("data/uploads")
+
+    # Repo root, so the API can reach the module checkpoints without each
+    # endpoint recomputing a relative path.
+    repo_root: Path = Path(__file__).resolve().parents[3]
+
+    # Recorded alongside every prediction. Bump when a model is retrained.
+    vein_model_version: str = "attention-unet-v1"
+    infection_model_version: str = "lgbm-risk-v1"
+
+    # Set true in tests to skip loading real checkpoints.
+    disable_ml: bool = False
+
     # CORS origins for the Next.js dashboard.
     frontend_origin: str = "http://localhost:3000"
 

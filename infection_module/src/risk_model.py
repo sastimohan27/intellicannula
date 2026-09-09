@@ -272,7 +272,10 @@ def predict_risk(features: dict[str, float], model_path: Path | None = None) -> 
         _booster_cache[key] = lgb.Booster(model_file=str(path))
 
     vector = np.array([[features[name] for name in feature_names()]])
-    return float(_booster_cache[key].predict(vector)[0])
+    # num_threads=1: LightGBM and PyTorch bundle separate OpenMP runtimes, and
+    # letting both spin up thread pools in one process segfaults on macOS. A
+    # single-row prediction gains nothing from parallelism anyway.
+    return float(_booster_cache[key].predict(vector, num_threads=1)[0])
 
 
 def evaluate_external(
