@@ -77,8 +77,33 @@ infection_module/data/cannula_raw/
 ```
 
 After export, arrange into `data/cannula/{train,val,test}/{images,labels}/` to
-match `infection_module/src/cannula_detector/data.yaml`, then:
+match `infection_module/src/cannula_detector/data.yaml`.
+
+## Validate before you train
+
+```bash
+python infection_module/src/cannula_detector/validate_labels.py --root data/cannula
+```
+
+Run this **first**. Every check it makes corresponds to a failure that would
+otherwise waste the whole training run, or silently produce an inflated score:
+
+| Check | Why it matters |
+|---|---|
+| Pixel vs normalised coordinates | The most common export mistake. YOLO wants `[0,1]`, and pixel values train a model on nonsense. |
+| Missing label files | A missing `.txt` is ambiguous between "no cannula" and "not yet labelled". Create an empty file for genuine negatives. |
+| Class id ≠ 0 | Single-class dataset; a stray id 1 silently creates a phantom class. |
+| Whole-frame boxes | `crop_roi` expands the box 40% per side. A box round the entire dressing pulls in bedsheet, and the healthy-skin reference gets sampled from linen. |
+| **Patient leakage across splits** | The big one. Three photos of one site in train *and* test means test mAP measures memorisation. This exact trap inflated the Phase 5 risk model to F1 0.99 before it was caught. |
+| No negative images | Without hard negatives the detector learns "find the shiny plastic thing" and fires on a wristwatch. |
+
+Then:
 
 ```bash
 python infection_module/src/cannula_detector/train.py
 ```
+
+The training pipeline itself is already verified — `test_cannula_pipeline.py`
+runs a two-epoch train/checkpoint/infer cycle against a public sample dataset,
+so when your images are ready, training fails for dataset reasons only, never
+because of a typo in the training call.
