@@ -46,4 +46,9 @@ infection_module/models/*
 
 # --- Local API artifacts ---
 backend/*.db
-data/uploads/
+*.db
+# Leading-slash-free and slash-free so it matches at ANY depth. The earlier
+# `data/uploads/` contained a slash, which git anchors to the repo root, so it
+# silently failed to match backend/data/uploads/ and five real patient images
+# were committed.
+uploads/
