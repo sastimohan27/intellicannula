@@ -1,8 +1,23 @@
 import axios from "axios";
 import type { Patient, PatientHistory, SiteCheckin, VeinScan } from "./types";
 
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/**
+ * API base URL. A configured `localhost` URL is rewritten to the host the page
+ * was loaded from, so opening the dashboard on a phone at
+ * http://<laptop-IP>:3000 calls the API on the laptop, not on the phone.
+ */
+function resolveApiUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  if (typeof window === "undefined") return configured;
+  const url = new URL(configured);
+  const page = window.location.hostname;
+  if (["localhost", "127.0.0.1"].includes(url.hostname) && !["localhost", "127.0.0.1"].includes(page)) {
+    url.hostname = page;
+  }
+  return url.origin;
+}
+
+export const API_URL = resolveApiUrl();
 
 const client = axios.create({ baseURL: API_URL, timeout: 120_000 });
 

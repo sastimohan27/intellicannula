@@ -2,7 +2,7 @@
 
 import {
   CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer,
-  Scatter, Tooltip, XAxis, YAxis,
+  Tooltip, XAxis, YAxis,
 } from "recharts";
 import type { HistoryPoint } from "@/lib/types";
 
@@ -26,7 +26,7 @@ export default function RiskChart({ points }: { points: HistoryPoint[] }) {
     index: i + 1,
     risk: Number(p.risk_score.toFixed(4)),
     time: new Date(p.timestamp).toLocaleString(),
-    alert: p.alert_triggered ? Number(p.risk_score.toFixed(4)) : null,
+    alert: p.alert_triggered,
     degraded: p.registration_degraded,
   }));
 
@@ -40,11 +40,19 @@ export default function RiskChart({ points }: { points: HistoryPoint[] }) {
         <Tooltip
           formatter={(value) => (typeof value === "number" ? value.toFixed(3) : String(value ?? ""))}
           labelFormatter={(i) => data[Number(i) - 1]?.time ?? ""}
+          contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, fontSize: 12 }}
+          labelStyle={{ color: "#94a3b8" }}
         />
         <ReferenceLine y={0.6} stroke="#dc2626" strokeDasharray="4 4"
                        label={{ value: "alert 0.6", fontSize: 11, fill: "#dc2626" }} />
-        <Line type="monotone" dataKey="risk" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
-        <Scatter dataKey="alert" fill="#dc2626" shape="circle" />
+        {/* Alert points are coloured via the line's own dots. A separate <Scatter>
+            series would add its own rows (x index, unnamed value) to the tooltip. */}
+        <Line type="monotone" dataKey="risk" name="risk" stroke="#2563eb" strokeWidth={2}
+              isAnimationActive={false}
+              dot={({ cx, cy, payload, index }) => (
+                <circle key={index} cx={cx} cy={cy} r={payload.alert ? 4 : 3}
+                        fill={payload.alert ? "#dc2626" : "#2563eb"} stroke="none" />
+              )} />
       </LineChart>
     </ResponsiveContainer>
   );

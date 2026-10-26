@@ -36,7 +36,21 @@ class Settings(BaseSettings):
 
     # Recorded alongside every prediction. Bump when a model is retrained.
     vein_model_version: str = "attention-unet-v1"
-    infection_model_version: str = "lgbm-risk-v1"
+
+    # Vein mask post-processing, tuned on 100 val images for the epoch-16
+    # checkpoint (re-tune whenever the model is retrained): val Dice 0.611.
+    # 100 px scored marginally higher (0.615) but deletes short real veins. A higher threshold
+    # and dropping tiny components removes the speckle and halo the network
+    # predicts around real veins, which otherwise skews site selection.
+    vein_mask_threshold: float = 0.9
+    vein_min_component_px: int = 60
+
+    # A site check is only scored when the detector finds a cannula hub at or
+    # above this confidence. Measured on images with no cannula: 2/40 cubital
+    # forearm frames scored 0.40-0.47 (max 0.474), a landscape photo 0.24; the
+    # synthetic positives score 0.57-0.86. 0.5 rejects every negative seen.
+    cannula_conf_threshold: float = 0.5
+    infection_model_version: str = "erythema-v1"
 
     # Set true in tests to skip loading real checkpoints.
     disable_ml: bool = False

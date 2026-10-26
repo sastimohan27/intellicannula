@@ -5,13 +5,7 @@ import AlertBanner from "@/components/AlertBanner";
 import RiskChart from "@/components/RiskChart";
 import UploadCard from "@/components/UploadCard";
 import { getHistory, getPatient, postSiteCheck, postVeinScan } from "@/lib/api";
-import type { Patient, PatientHistory, SiteCheckin, VeinScan } from "@/lib/types";
-
-function riskBadge(score: number) {
-  if (score >= 0.6) return { label: "High", cls: "bg-red-600" };
-  if (score >= 0.3) return { label: "Moderate", cls: "bg-amber-500" };
-  return { label: "Low", cls: "bg-emerald-600" };
-}
+import type { HistoryPoint, Patient, PatientHistory, SiteCheckin, VeinScan } from "@/lib/types";
 
 export default function PatientPage({
   params,
@@ -24,6 +18,7 @@ export default function PatientPage({
   const [scan, setScan] = useState<VeinScan | null>(null);
   const [checkin, setCheckin] = useState<SiteCheckin | null>(null);
   const [history, setHistory] = useState<PatientHistory | null>(null);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -34,6 +29,7 @@ export default function PatientPage({
       ]);
       setPatient(p);
       setHistory(h);
+      setLoadedAt(Date.now());
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load patient");
@@ -100,8 +96,14 @@ export default function PatientPage({
                   <span>
                     Vein width <strong>{scan.vein_width_px?.toFixed(1)} px</strong>
                   </span>
-                  <span>
+                  {scan.vein_grade && (
+                    <span className="text-blue-700 dark:text-blue-400">
+                      Grade <strong>{scan.vein_grade}</strong>
+                    </span>
+                  )}
+                  <span className="text-slate-500" title={scan.reason ?? undefined}>
                     Confidence <strong>{scan.confidence.toFixed(2)}</strong>
+                    {scan.reason && <span className="ml-1">· {scan.reason}</span>}
                   </span>
                 </div>
                 {scan.overlay_png_base64 && (
@@ -125,9 +127,10 @@ export default function PatientPage({
       {/* 2 — Post-cannulation */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">2 · Post-cannulation site check</h2>
+        <CheckDue points={history?.points ?? []} now={loadedAt} />
         <UploadCard
           title="Capture IV site"
-          description="RGB photo of the cannula site with surrounding skin visible."
+          description="Daily photo of the cannula site. Hold the phone ~20 cm away, flash off, hub in the centre, with normal skin visible around the dressing. The first photo becomes this patient's baseline."
           buttonLabel="Upload site check"
           onUpload={async (file) => {
             setCheckin(await postSiteCheck(patientId, file));
@@ -135,38 +138,12 @@ export default function PatientPage({
           }}
         />
 
-        {checkin && (
-          <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className={`rounded px-2 py-1 text-sm font-semibold text-white ${riskBadge(checkin.risk_score).cls}`}
-              >
-                {riskBadge(checkin.risk_score).label} · {checkin.risk_score.toFixed(2)}
-              </span>
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                trend {checkin.trend} · Δ {checkin.delta_from_previous >= 0 ? "+" : ""}
-                {checkin.delta_from_previous.toFixed(3)}
-              </span>
-            </div>
-
-            {checkin.alert_triggered && (
-              <p className="mt-2 text-sm font-medium text-red-700 dark:text-red-400">
-                Alert: {checkin.alert_reason}
-              </p>
-            )}
-            {checkin.registration_degraded && (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                Alignment fell back to translation only — compare this reading
-                with the baseline cautiously.
-              </p>
-            )}
-          </div>
-        )}
+        {checkin && <SiteCheckResult checkin={checkin} />}
       </section>
 
       {/* 3 — Trend */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">3 · Risk over time</h2>
+        <h2 className="text-lg font-semibold">3 · Redness over time</h2>
         <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
           <RiskChart points={history?.points ?? []} />
           {history && history.n_checkins > 0 && (
@@ -183,5 +160,111 @@ export default function PatientPage({
         requires clinician confirmation.
       </footer>
     </main>
+  );
+}
+
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+
+/** Reminder when the daily site photo is overdue. */
+function CheckDue({ points, now }: { points: HistoryPoint[]; now: number | null }) {
+  if (points.length === 0 || now === null) return null;
+  const last = new Date(points[points.length - 1].timestamp).getTime();
+  const hours = (now - last) / 36e5;
+  if (hours < 24) return null;
+  return (
+    <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+      Site check due — last photo {Math.floor(hours / 24)} day{hours >= 48 ? "s" : ""} ago.
+    </p>
+  );
+}
+
+function SiteCheckResult({ checkin }: { checkin: SiteCheckin }) {
+  const level = checkin.redness_level;
+  const levelCls =
+    level === null ? "bg-slate-600"
+      : level >= 3 ? "bg-red-600"
+      : level === 2 ? "bg-orange-600"
+      : level === 1 ? "bg-amber-500"
+      : "bg-emerald-600";
+  const change = checkin.change_since_baseline;
+
+  return (
+    <div className="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className={`rounded px-2 py-1 text-sm font-semibold text-white ${levelCls}`}>
+          {checkin.redness_label ?? "Measured"}
+        </span>
+        <span className="text-sm text-slate-600 dark:text-slate-400">
+          score <strong>{checkin.risk_score.toFixed(2)}</strong> · {checkin.risk_velocity ?? checkin.trend}
+        </span>
+        {checkin.cannula_confidence !== null && (
+          <span className="text-sm text-slate-500">
+            Cannula detected · {checkin.cannula_confidence.toFixed(2)}
+          </span>
+        )}
+      </div>
+
+      {checkin.reddened_fraction !== null && (
+        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+          <Stat label="Reddened skin around site" value={pct(checkin.reddened_fraction)} />
+          <Stat
+            label="Change since baseline"
+            value={change === null ? "—" : `${change >= 0 ? "+" : ""}${Math.round(change * 100)} pts`}
+          />
+          <Stat
+            label="Redness reaches"
+            value={checkin.reddened_fraction >= 0.1 && checkin.spread_hub_widths !== null
+              ? `${checkin.spread_hub_widths.toFixed(1)} hub widths` : "—"}
+          />
+          <Stat
+            label="Skin visible in ring"
+            value={checkin.skin_visible_fraction === null ? "—" : pct(checkin.skin_visible_fraction)}
+          />
+        </dl>
+      )}
+
+      {checkin.overlay_png_base64 && (
+        <figure>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`data:image/png;base64,${checkin.overlay_png_base64}`}
+            alt="Site photo: green box is the detected hub, cyan outlines the measured ring, red marks skin counted as reddened"
+            className="max-h-[28rem] max-w-full rounded"
+          />
+          <figcaption className="mt-1 text-xs text-slate-500">
+            Green: detected hub · cyan: measured ring · red: skin counted as reddened.
+            Dressing, tape and plastic are excluded.
+          </figcaption>
+        </figure>
+      )}
+
+      {checkin.clinical_explanation && checkin.clinical_explanation.length > 0 && (
+        <div className="space-y-1 rounded border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">What was measured</p>
+          <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-400">
+            {checkin.clinical_explanation.map((reason, i) => <li key={i}>{reason}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {checkin.alert_triggered && (
+        <p className="text-sm font-medium text-red-700 dark:text-red-400">
+          Alert: {checkin.alert_reason}
+        </p>
+      )}
+      <p className="text-xs text-slate-500">
+        Measures visible redness only — not pain, swelling or a palpable cord, so it is not a
+        VIP score. Method {checkin.model_version}; not clinically validated.
+      </p>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-slate-200 p-2 dark:border-slate-700">
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-0.5 font-semibold">{value}</dd>
+    </div>
   );
 }

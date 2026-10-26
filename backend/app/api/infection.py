@@ -102,6 +102,22 @@ async def create_site_check(
 
     response = SiteCheckinOut.model_validate(checkin)
     response.roi_bbox = result["roi_bbox"]
+    response.cannula_confidence = result.get("cannula_confidence")
+    redness = result.get("redness")
+    if redness is not None:
+        response.redness_level = redness["redness_level"]
+        response.redness_label = redness["redness_label"]
+        response.reddened_fraction = redness["reddened_fraction"]
+        response.spread_hub_widths = redness["spread_hub_widths"]
+        response.skin_visible_fraction = redness["skin_fraction"]
+    response.baseline_reddened_fraction = result.get("baseline_reddened_fraction")
+    response.change_since_baseline = result.get("change_since_baseline")
+    response.overlay_png_base64 = result.get("overlay_png_base64")
+    response.risk_velocity = _format_risk_velocity(delta)
+    response.clinical_explanation = _explain(
+        redness, result.get("change_since_baseline"), is_baseline=not previous,
+        trend=checkin.trend,
+    )
     return response
 
 
@@ -139,3 +155,48 @@ def _trend(history: list[float]) -> str:
     if slope < -0.02:
         return "improving"
     return "stable"
+
+
+def _format_risk_velocity(delta: float) -> str:
+    """Format the change in risk as a clinical trend string."""
+    if abs(delta) < 0.05:
+        return "Stable"
+    direction = "+" if delta > 0 else ""
+    return f"{direction}{delta:.2f} / day"
+
+
+def _explain(
+    redness: dict | None, change: float | None, is_baseline: bool, trend: str | None
+) -> list[str]:
+    """Plain statements of what was measured - every number traceable to the photo."""
+    if redness is None:
+        return []
+    lines = [
+        f"{redness['reddened_fraction']:.0%} of the visible skin around the cannula is "
+        "redder than this patient's skin further from the site "
+        "(CIELAB \u0394a* above 6).",
+    ]
+    if redness["reddened_fraction"] >= 0.10:
+        lines.append(
+            f"Reddened skin reaches about {redness['spread_hub_widths']:.1f} hub widths "
+            "from the insertion point."
+        )
+    if is_baseline:
+        lines.append(
+            "This is the baseline photo. Later check-ins are compared with it, so "
+            "naturally redder skin (e.g. on the hand) is not mistaken for change."
+        )
+    elif change is None:
+        lines.append("The baseline photo has no detectable cannula, so change since "
+                     "insertion cannot be computed.")
+    else:
+        lines.append(f"Change since baseline: {change * 100:+.0f} percentage points of reddened skin.")
+    if trend == "worsening":
+        lines.append("Redness is rising across recent check-ins.")
+    lines.append(
+        f"Only {redness['skin_fraction']:.0%} of the ring around the hub is visible skin; "
+        "dressing, tape and plastic are excluded from the measurement."
+        if redness["skin_fraction"] < 0.4 else
+        "Dressing, tape and the plastic hub are excluded from the measurement."
+    )
+    return lines

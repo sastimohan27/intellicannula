@@ -34,14 +34,28 @@ def train(
     overfits before it generalises. `yolo11s.pt` is the fallback if nano
     underfits - check the val mAP curve in runs/ before reaching for it.
     """
+    import tempfile
+    import yaml
     from ultralytics import YOLO
 
     if not data_yaml.exists():
         raise FileNotFoundError(f"no dataset config at {data_yaml}")
 
+    # Ensure path in data_yaml is resolved to absolute so ultralytics doesn't
+    # misinterpret relative paths against global datasets_dir
+    raw_cfg = yaml.safe_load(data_yaml.read_text())
+    base_path = Path(raw_cfg.get("path", "."))
+    if not base_path.is_absolute():
+        resolved_path = (data_yaml.parent / base_path).resolve()
+        raw_cfg["path"] = str(resolved_path)
+
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tmp_f:
+        yaml.dump(raw_cfg, tmp_f)
+        resolved_yaml = tmp_f.name
+
     model = YOLO(model_name)
     model.train(
-        data=str(data_yaml),
+        data=resolved_yaml,
         epochs=epochs,
         imgsz=imgsz,
         batch=batch,

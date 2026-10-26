@@ -12,6 +12,7 @@ is passed through as a real result rather than being papered over.
 from __future__ import annotations
 
 import base64
+import functools
 import logging
 import os
 import sys
@@ -52,6 +53,69 @@ _tracker = None
 
 class ModelNotAvailable(RuntimeError):
     """Raised when a checkpoint is missing, with how to produce it."""
+
+
+class NoCannulaDetected(ValueError):
+    """The photo has no detectable cannula hub, so there is no site to score.
+
+    A ValueError so the endpoint maps it to 422: scoring an arbitrary region of
+    a photo with no cannula in it produced confident risk scores for images
+    that were not IV sites at all.
+    """
+
+
+class PhotoQualityError(ValueError):
+    """The photo is too blurred, dark or overexposed to measure; ask for a retake."""
+
+
+# Measured on the demo and test photos: every usable photo scored sharpness
+# >= 57 (variance of the Laplacian at <=1024 px), Gaussian-blurred copies <= 3.3.
+MIN_SHARPNESS = 20.0
+MIN_BRIGHTNESS = 40.0
+MAX_OVEREXPOSED = 0.25
+
+
+def check_photo_quality(image: np.ndarray) -> dict:
+    """Reject photos that cannot be measured reliably, before any model runs."""
+    import cv2
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    scale = 1024 / max(gray.shape)
+    if scale < 1:
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    brightness = float(gray.mean())
+    overexposed = float((gray > 250).mean())
+
+    if sharpness < MIN_SHARPNESS:
+        raise PhotoQualityError("Photo is blurred. Hold the phone steady and tap to focus on the cannula.")
+    if brightness < MIN_BRIGHTNESS:
+        raise PhotoQualityError("Photo is too dark. Turn on the room light (keep the flash off).")
+    if overexposed > MAX_OVEREXPOSED:
+        raise PhotoQualityError("Photo is overexposed. Turn off the flash and avoid direct light on the dressing.")
+    return {"sharpness": sharpness, "brightness": brightness, "overexposed": overexposed}
+
+
+def _requires_ml_deps(fn):
+    """Turn a missing heavy dependency (torch, cv2, ...) into ModelNotAvailable.
+
+    Without this the ImportError escapes as an unhandled 500, which skips the
+    CORS middleware - so the browser reports "cannot reach the API" instead of
+    the real problem.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except ModuleNotFoundError as exc:
+            raise ModelNotAvailable(
+                f"ML dependency '{exc.name}' is not installed in this Python "
+                f"({sys.executable}). Run the API from infection_module/.venv - "
+                "see backend/requirements.txt."
+            ) from exc
+
+    return wrapper
 
 
 def _decode_image(data: bytes) -> np.ndarray:
@@ -98,6 +162,7 @@ def get_vein_model():
     return _vein_model
 
 
+@_requires_ml_deps
 def run_vein_scan(image_bytes: bytes) -> dict:
     """Preprocess, segment, choose an insertion site, estimate an angle.
 
@@ -108,6 +173,7 @@ def run_vein_scan(image_bytes: bytes) -> dict:
     import torch
 
     from vein_module.src.augmentations import get_eval_transform
+    from vein_module.src.postprocess import binarize
     from vein_module.src.site_selector import estimate_needle_angle, select_insertion_site
 
     model, image_size = get_vein_model()
@@ -121,7 +187,7 @@ def run_vein_scan(image_bytes: bytes) -> dict:
 
     with torch.inference_mode():
         probs = torch.sigmoid(model(tensor)).numpy()[0, 0]
-    mask = (probs > 0.5).astype(np.uint8)
+    mask = binarize(probs, settings.vein_mask_threshold, settings.vein_min_component_px)
 
     site = select_insertion_site(mask)
 
@@ -180,95 +246,140 @@ def get_tracker():
     return _tracker
 
 
-def run_site_check(image_bytes: bytes, patient_id: int, baseline_bytes: bytes | None) -> dict:
-    """Detect the hub, register against baseline, extract features, score risk.
+_baseline_cache: dict[str, dict | None] = {}
 
-    ROI is located twice on purpose. Registration warps the new photo into the
-    *baseline's* coordinate frame, so it comes back with the baseline's
-    dimensions - which may differ from the photo just uploaded. An ROI measured
-    on the original image is meaningless afterwards, and using it raised
-    "ROI [140, 91.5, 420, 274.5] is empty on a (80, 94) image" the first time
-    the two differed in size.
 
-    So: locate once on the original to anchor the translation fallback, then
-    locate again on the aligned image, which is the frame the features are
-    actually measured in.
+@_requires_ml_deps
+def run_site_check(
+    image_bytes: bytes, patient_id: int, baseline_bytes: bytes | None
+) -> dict:
+    """Detect the hub, then measure redness in the skin ring around it.
+
+    Scoring is `infection_module.src.erythema` (see its docstring for why the
+    LightGBM proxy model was retired from this path). Each photo is measured
+    around its *own* detected hub against skin further out in the *same* photo,
+    so no cross-visit image warping is needed - which removes the failure where
+    warping onto an unrelated baseline lost the hub. The baseline photo is
+    measured the same way, and the change is a difference of two measurements.
     """
-    from infection_module.src.feature_extractor import extract_all_features
-    from infection_module.src.registration import register_images
-    from infection_module.src.risk_model import predict_risk
+    from infection_module.src import erythema
 
     image = _decode_image(image_bytes)
-    anchor_bbox = _locate_roi(image)
+    check_photo_quality(image)
+    roi_bbox, cannula_confidence, hub = _locate_roi(image)
+    result = erythema.measure(image, hub)
+    current = erythema.public(result)
 
-    degraded = False
-    aligned = image
-    if baseline_bytes is not None:
-        baseline = _decode_image(baseline_bytes)
-        aligned, info = register_images(
-            baseline, image, roi_bbox=anchor_bbox, return_info=True
-        )
-        degraded = info["degraded"]
-
-    roi_bbox = _locate_roi(aligned) if aligned.shape[:2] != image.shape[:2] else anchor_bbox
-
-    try:
-        features = extract_all_features(aligned, roi_bbox)
-    except ValueError as exc:
-        raise ValueError(
-            f"{exc} Capture the site with more surrounding skin visible, and "
-            "keep framing consistent with the baseline photo."
-        ) from exc
-
-    model_path = settings.repo_root / "infection_module/models/risk_lgbm.txt"
-    if not model_path.exists():
-        raise ModelNotAvailable(
-            f"no risk model at {model_path}. Train one with "
-            "`python infection_module/src/risk_model.py --train`."
-        )
-    risk = predict_risk(features, model_path)
+    baseline = _baseline_measurement(baseline_bytes) if baseline_bytes else None
+    change = (
+        current["reddened_fraction"] - baseline["reddened_fraction"]
+        if baseline is not None else None
+    )
 
     return {
-        "risk_score": risk,
+        "risk_score": erythema.risk_score(current["reddened_fraction"]),
         "roi_bbox": roi_bbox,
-        "color_distance": features["color_lab_distance"],
-        "registration_degraded": degraded,
+        "color_distance": current["mean_delta_a"],
+        "registration_degraded": False,
+        "cannula_confidence": cannula_confidence,
+        "redness": current,
+        "baseline_reddened_fraction": (
+            baseline["reddened_fraction"] if baseline is not None else None
+        ),
+        "change_since_baseline": change,
+        "overlay_png_base64": erythema.overlay_png_base64(result),
         "model_version": settings.infection_model_version,
     }
 
 
-def _locate_roi(image: np.ndarray) -> list[float]:
-    """Find the monitoring ROI, preferring the cannula detector.
+def _baseline_measurement(baseline_bytes: bytes) -> dict | None:
+    """Redness of the patient's first photo; None when it is unusable.
 
-    Falls back to the central region when no detector weights exist - Phase 4
-    needs hand-labelled data that is not public. The fallback is honest rather
-    than silent: it is logged, and it assumes the photographer centred the site,
-    which is what the capture instructions ask for.
+    Cached by content hash: the baseline never changes, and re-running the
+    detector subprocess on it for every check-in would double the latency.
+    A baseline with no detectable hub (stored before the cannula gate
+    existed) yields None, and the change is reported as unavailable rather
+    than computed against an arbitrary region.
     """
-    from infection_module.src.cannula_detector.inference import crop_roi  # noqa: F401
+    import hashlib
+
+    from infection_module.src import erythema
+
+    key = hashlib.sha256(baseline_bytes).hexdigest()
+    if key not in _baseline_cache:
+        try:
+            image = _decode_image(baseline_bytes)
+            _, _, hub = _locate_roi(image)
+            _baseline_cache[key] = erythema.public(erythema.measure(image, hub))
+        except ValueError as exc:
+            log.warning("baseline photo unusable for comparison: %s", exc)
+            _baseline_cache[key] = None
+    return _baseline_cache[key]
+
+
+def _locate_roi(image: np.ndarray) -> tuple[list[float], float, list[float]]:
+    """Find the monitoring ROI around the detected cannula hub.
+
+    Returns `(roi_bbox, detector_confidence, hub_bbox)`; the ROI is the hub box
+    plus a 40% margin, for display and storage. There is deliberately no
+    fallback region: an earlier version scored the image centre whenever the
+    detector found nothing (or crashed), which gave a landscape photo an
+    infection risk of 0.999. No hub means no site, so this raises instead.
+
+    The detector runs in a subprocess because ultralytics' torch and LightGBM
+    each bundle OpenMP, and loading both in one process segfaults on macOS.
+    """
+    import json
+    import subprocess
+    import tempfile
+
+    import cv2
 
     weights = settings.repo_root / "infection_module/models/cannula_yolo11.pt"
-    if weights.exists():
-        import tempfile
+    if not weights.exists():
+        raise ModelNotAvailable(
+            f"no cannula detector at {weights}. Train one with "
+            "`python infection_module/src/cannula_detector/train.py`."
+        )
 
-        import cv2
+    threshold = settings.cannula_conf_threshold
+    with tempfile.TemporaryDirectory() as tmp:
+        image_path = Path(tmp) / "site.png"
+        cv2.imwrite(str(image_path), image)
+        py_cmd = (
+            "import json, sys\n"
+            "from pathlib import Path\n"
+            "from infection_module.src.cannula_detector.inference import detect_cannula\n"
+            "res = detect_cannula(sys.argv[1], conf_threshold=float(sys.argv[3]),"
+            " weights=Path(sys.argv[2]))\n"
+            "print(json.dumps(res))\n"
+        )
+        env = {**os.environ, "PYTHONPATH": str(settings.repo_root)}
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-c", py_cmd, str(image_path), str(weights), str(threshold)],
+                capture_output=True, timeout=60, env=env, check=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            tail = exc.stderr.decode(errors="replace").strip().splitlines()[-1:] or ["?"]
+            raise ModelNotAvailable(f"cannula detector failed: {tail[0]}") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise ModelNotAvailable("cannula detector timed out") from exc
 
-        from infection_module.src.cannula_detector.inference import detect_cannula
+    lines = proc.stdout.decode().strip().splitlines()
+    detection = json.loads(lines[-1]) if lines else None
+    if detection is None:
+        raise NoCannulaDetected(
+            f"No cannula detected in this photo (detector confidence below "
+            f"{threshold:.2f}). Retake it with the cannula hub and dressing "
+            "clearly in frame."
+        )
 
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as handle:
-            cv2.imwrite(handle.name, image)
-            detection = detect_cannula(handle.name, weights=weights)
-        if detection is not None:
-            x1, y1, x2, y2 = detection["bbox"]
-            mx, my = (x2 - x1) * 0.4, (y2 - y1) * 0.4
-            height, width = image.shape[:2]
-            return [
-                max(0.0, x1 - mx), max(0.0, y1 - my),
-                min(float(width), x2 + mx), min(float(height), y2 + my),
-            ]
-        log.info("cannula detector found no hub; using centre ROI")
-    else:
-        log.debug("no cannula detector weights; using centre ROI")
-
+    x1, y1, x2, y2 = detection["bbox"]
+    mx, my = (x2 - x1) * 0.4, (y2 - y1) * 0.4
     height, width = image.shape[:2]
-    return [width * 0.25, height * 0.25, width * 0.75, height * 0.75]
+    roi = [
+        max(0.0, x1 - mx), max(0.0, y1 - my),
+        min(float(width), x2 + mx), min(float(height), y2 + my),
+    ]
+    return roi, float(detection["confidence"]), [float(v) for v in detection["bbox"]]

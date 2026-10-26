@@ -19,8 +19,8 @@ confirmation.
         │                │      │                 │
         │ NIR image      │      │ RGB image       │
         │  → segment     │      │  → detect hub   │
-        │  → pick site   │      │  → register     │
-        │  → angle       │      │  → risk + trend │
+        │  → pick site   │      │  → skin ring    │
+        │  → angle       │      │  → redness+trend│
         └────────────────┘      └─────────────────┘
                      ┌───────────────┴──────────────┐
                      │   PostgreSQL  +  S3/MinIO    │
@@ -32,10 +32,13 @@ confirmation.
 veins with an Attention U-Net, pick the widest straightest accessible segment as
 an insertion site, and suggest a needle angle.
 
-**Post-cannulation (infection module)** — given sequential photos of the same IV
-site, detect the cannula hub with YOLOv11, register each new image against the
-patient's baseline, extract colour/texture features, and flag deterioration
-before it becomes phlebitis or cellulitis.
+**Post-cannulation (infection module)** — given a daily photo of the IV site,
+check photo quality, detect the cannula hub with YOLOv11 (no hub → retake, never
+a guess), measure redness (CIELAB Δa\*) in a ring of skin around the hub against
+normal skin further out in the same photo, and compare with the patient's own
+day-0 photo. Alerts fire on high redness, a sharp rise, or three rises in a row.
+See [`infection_module/src/erythema.py`](infection_module/src/erythema.py) for
+why this replaced the LightGBM proxy model in the live path.
 
 ---
 
@@ -69,19 +72,39 @@ docker compose up -d          # postgres only
 
 ### 2. Backend
 
+The API needs the ML dependencies (torch, OpenCV, ultralytics), which live in
+`infection_module/.venv`. Install the API requirements into it and run from there:
+
 ```bash
-uv venv backend/.venv --python 3.12
-uv pip install --python backend/.venv -r backend/requirements.txt
-cd backend && ../backend/.venv/bin/uvicorn app.main:app --reload
+uv pip install --python infection_module/.venv -r backend/requirements.txt
+cd backend && ../infection_module/.venv/bin/python -m uvicorn app.main:app \
+    --reload --host 0.0.0.0 --port 8001
 ```
 
-`http://localhost:8000/health` → `{"status":"ok","version":"0.1.0"}`
+`http://localhost:8001/health` → `{"status":"ok","version":"0.1.0"}`.
+Run from `backend/.venv` instead and the ML endpoints return 503 naming the
+missing package.
 
 ### 3. Frontend
 
 ```bash
-cd frontend && npm run dev    # http://localhost:3000
+cd frontend && npm run dev -- -H 0.0.0.0 -p 3000    # http://localhost:3000
 ```
+
+### Using it from a phone
+
+With both servers started with `--host 0.0.0.0` / `-H 0.0.0.0`, and the phone on
+the same Wi-Fi, open `http://<laptop-IP>:3000` (`ipconfig getifaddr en0` on
+macOS). Upload buttons open the rear camera directly. The frontend rewrites a
+`localhost` API URL to the laptop's address, CORS allows private-network
+origins, and `next.config.ts` allows the laptop's LAN IPs as dev origins.
+Restart the frontend after changing networks.
+
+### Demo images
+
+`scripts/make_demo_sequence.py` builds a **simulated** three-day site sequence
+(drawn hub on a real limb photo, redness added on days 2-3). It demonstrates the
+pipeline end to end; it is not evidence of detecting real phlebitis.
 
 ### 4. ML modules (per-module venvs — torch is heavy, keep it out of the API env)
 
@@ -98,8 +121,8 @@ uv pip install --python infection_module/.venv -r infection_module/requirements.
 ### Tests
 
 ```bash
-infection_module/.venv/bin/python -m pytest -q   # module tests (47)
-cd backend && .venv/bin/python -m pytest -q      # API tests (2)
+infection_module/.venv/bin/python -m pytest -q                    # module tests (188)
+cd backend && ../infection_module/.venv/bin/python -m pytest -q   # API tests (39)
 ```
 
 ### Full containerised stack (deployment parity check)
@@ -158,8 +181,8 @@ on it is reported as proxy-label performance, and the caveat is written into
 - [x] **Phase 2** — Data pipeline: subject-level splits, augmentation, data report
 - [x] **Phase 3** — Vein module: Attention U-Net (7.85M params), trained on
       CUBITAL. Test Dice 0.3698 — under-trained, see limitations
-- [ ] **Phase 4** — Cannula detection: scaffolded; blocked on ~100–200
-      hand-labelled images that do not exist publicly
+- [x] **Phase 4** — Cannula detection: trained via domain-randomized procedural
+      compositing on real skin backgrounds; val mAP@50 0.995, precision 0.982
 - [x] **Phase 5** — Infection monitoring: registration, 30 features, LightGBM
       risk model, temporal tracker
 - [x] **Phase 6** — Backend API + clinician dashboard, verified end to end
@@ -167,17 +190,25 @@ on it is reported as proxy-label performance, and the caveat is written into
       latency benchmark
 - [x] **Phase 8** — ONNX export with parity check, audit logging, deployment
       checklist
+- [x] **Phase 9** — Detection correctness (see
+      [`docs/REVIEW2_RESULTS.md`](docs/REVIEW2_RESULTS.md)): vein model resumed
+      to epoch 16, tuned mask post-processing (test Dice 0.370 → 0.567),
+      strict cannula gate, vein grade fix
+- [x] **Phase 10** — Redness-based site scoring replacing the saturating proxy
+      model, photo-quality gate, phone capture, check-due reminder
 
 ### Results at a glance
 
 | Component | Metric | Value |
 |---|---|---|
-| Vein segmentation | Dice / IoU (test) | 0.3698 / 0.2390 |
-| Infection risk | F1 (5-fold, grouped) | 0.9885 — **proxy labels** |
-| Infection risk | External detection (extravasation) | 100% (n=21) |
+| Vein segmentation | Dice / IoU (test, epoch 16, thr 0.9) | 0.567 / 0.413 (was 0.370 / 0.239) |
+| Vein segmentation | Precision / recall (test) | 0.495 / 0.758 (was 0.262 / 0.814) |
+| Cannula gate | No-cannula images passing (n=121) | 0 |
+| Site redness | Functional tests (monotonic, tape/plastic excluded) | pass — **not clinical validation** |
+| Infection risk (retired from API) | F1 (5-fold, grouped) | 0.9885 — **proxy labels** |
 | Latency | vein-scan / site-check | 654 ms / 7 ms |
 | ONNX parity | max abs difference | 6.6e-06 |
-| Tests | module + API | 157 + 29 |
+| Tests | module + API | 188 + 39 |
 
 Read [`docs/full_system_eval.md`](docs/full_system_eval.md) before quoting any
 of these. The infection F1 is a proxy-label number that an ablation shows is
@@ -193,7 +224,13 @@ known failure where it can mark an insertion point off the patient.
    labelled images. Budget 1–2 days before starting it.
 3. **No RGB vein data** — see "Camera modality" above.
 4. **AZH has no infection labels** — only wound type. The Phase 5 `is_infected`
-   target is a proxy label and every metric derived from it must say so.
+   target is a proxy label and every metric derived from it must say so. It
+   saturated at ~0.999 on real IV photos, so the API now uses the redness
+   measurement instead.
+5. **Redness thresholds are not clinically validated** — they need daily
+   nurse-scored (VIP) photos of real IV sites to calibrate.
+6. **Cannula detector trained on 90 synthetic images** — misses some real hubs
+   (the gate turns a miss into a retake request, not a wrong score).
 
 ## Scope
 

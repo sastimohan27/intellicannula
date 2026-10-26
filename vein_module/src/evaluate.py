@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 from vein_module.src.augmentations import get_eval_transform
 from vein_module.src.data_loader import VeinSegmentationDataset
 from vein_module.src.model import AttentionUNet
+from vein_module.src.postprocess import binarize
 from vein_module.src.site_selector import estimate_needle_angle, select_insertion_site
 from vein_module.src.train import get_device
 
@@ -97,6 +98,9 @@ def evaluate(
     annotations_path: Path | None = None,
     threshold: float = 0.5,
     n_examples: int = 8,
+    min_component_px: int = 0,
+    split: str = "test",
+    write_report: bool = True,
 ) -> dict:
     device = get_device("auto")
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
@@ -108,7 +112,7 @@ def evaluate(
     model.eval()
 
     dataset = VeinSegmentationDataset(
-        data_dir, "test", get_eval_transform(image_size), image_size
+        data_dir, split, get_eval_transform(image_size), image_size
     )
     loader = DataLoader(dataset, batch_size=1, shuffle=False)
     nurse_points = load_nurse_annotations(annotations_path)
@@ -120,7 +124,7 @@ def evaluate(
     with torch.inference_mode():
         for index, (image, mask) in enumerate(loader):
             probs = torch.sigmoid(model(image.to(device))).cpu().numpy()[0, 0]
-            pred = (probs > threshold).astype(np.uint8)
+            pred = binarize(probs, threshold, min_component_px)
             target = mask.numpy()[0, 0].astype(np.uint8)
 
             metrics = segmentation_metrics(pred, target)
@@ -140,7 +144,7 @@ def evaluate(
             metrics["pred_empty"] = bool(pred.sum() == 0)
             per_image.append(metrics)
 
-            if len(saved_examples) < n_examples:
+            if write_report and len(saved_examples) < n_examples:
                 rgb = (image.numpy()[0].transpose(1, 2, 0) * 255).astype(np.uint8)
                 bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                 path = figures_dir / f"vein_example_{len(saved_examples):02d}.png"
@@ -167,6 +171,8 @@ def evaluate(
     summary = {
         "n_test_images": len(per_image),
         "threshold": threshold,
+        "min_component_px": min_component_px,
+        "split": split,
         # Headline numbers: images that actually contain a vein.
         "n_with_vein": len(with_vein),
         "dice": mean("dice", with_vein),
@@ -200,8 +206,9 @@ def evaluate(
             }
         )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    _write_report(summary, output_dir / "vein_module_eval_report.md")
+    if write_report:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _write_report(summary, output_dir / "vein_module_eval_report.md")
     log.info("Dice %.4f  IoU %.4f  site found %.0f%%",
              summary["dice"], summary["iou"], summary["site_found_rate"] * 100)
     return summary
@@ -343,6 +350,10 @@ def main() -> None:
         help="JSON mapping image stem -> [x, y] nurse-marked insertion point",
     )
     parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument(
+        "--min-component-px", type=int, default=0,
+        help="drop predicted blobs smaller than this; match the API setting",
+    )
     args = parser.parse_args()
 
     evaluate(
@@ -352,6 +363,7 @@ def main() -> None:
         Path(args.figures_dir),
         Path(args.annotations),
         args.threshold,
+        min_component_px=args.min_component_px,
     )
 
 

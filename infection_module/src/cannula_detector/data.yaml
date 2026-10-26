@@ -2,7 +2,7 @@
 #
 # Paths are relative to this file. Populate the split directories with the
 # labelled export described in docs/labeling_guide.md before training.
-path: ../../data/cannula
+path: ../../../data/cannula
 train: train/images
 val: val/images
 test: test/images

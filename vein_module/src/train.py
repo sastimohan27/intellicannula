@@ -216,7 +216,8 @@ def run_epoch(model, loader, criterion, device, optimizer=None, scaler=None):
 
 
 def train(
-    data_dir: Path, output_dir: Path, config: TrainConfig, run_dir: Path
+    data_dir: Path, output_dir: Path, config: TrainConfig, run_dir: Path,
+    resume: Path | None = None,
 ) -> dict:
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
@@ -264,15 +265,31 @@ def train(
     csv_path = output_dir / "training_log.csv"
     checkpoint_path = output_dir / "attention_unet_best.pt"
 
-    with csv_path.open("w", newline="") as handle:
-        csv.writer(handle).writerow(
-            ["epoch", "train_loss", "train_dice", "train_iou",
-             "val_loss", "val_dice", "val_iou", "lr", "seconds"]
-        )
-
     best_dice, best_epoch, epochs_without_improvement = -1.0, -1, 0
+    start_epoch = 1
 
-    for epoch in range(1, config.epochs + 1):
+    if resume is not None:
+        # Continue an interrupted run: weights, best-so-far, and the cosine LR
+        # position. Optimizer moments are restored when the checkpoint has them
+        # (older checkpoints did not save them; AdamW re-warms within an epoch).
+        state = torch.load(resume, map_location=device, weights_only=False)
+        model.load_state_dict(state["model_state_dict"])
+        if "optimizer_state_dict" in state:
+            optimizer.load_state_dict(state["optimizer_state_dict"])
+        start_epoch = state["epoch"] + 1
+        best_dice, best_epoch = state.get("val_dice", -1.0), state["epoch"]
+        for _ in range(state["epoch"]):
+            scheduler.step()
+        log.info("resumed from %s at epoch %d (val Dice %.4f)", resume, state["epoch"], best_dice)
+    else:
+        with csv_path.open("w", newline="") as handle:
+            csv.writer(handle).writerow(
+                ["epoch", "train_loss", "train_dice", "train_iou",
+                 "val_loss", "val_dice", "val_iou", "lr", "seconds"]
+            )
+
+    epoch = start_epoch - 1
+    for epoch in range(start_epoch, config.epochs + 1):
         started = time.time()
         train_loss, train_dice, train_iou = run_epoch(
             model, train_loader, criterion, device, optimizer, scaler
@@ -305,6 +322,7 @@ def train(
             torch.save(
                 {
                     "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
                     "epoch": epoch,
                     "val_dice": val_dice,
                     "val_iou": val_iou,
@@ -359,6 +377,7 @@ def main() -> None:
     )
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda", "mps"])
+    parser.add_argument("--resume", default=None, help="checkpoint to continue training from")
     args = parser.parse_args()
 
     config = TrainConfig(
@@ -372,7 +391,10 @@ def main() -> None:
         num_workers=args.num_workers,
         device=args.device,
     )
-    train(Path(args.data_dir), Path(args.output_dir), config, Path(args.run_dir))
+    train(
+        Path(args.data_dir), Path(args.output_dir), config, Path(args.run_dir),
+        resume=Path(args.resume) if args.resume else None,
+    )
 
 
 if __name__ == "__main__":

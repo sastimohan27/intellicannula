@@ -22,6 +22,7 @@ export interface VeinScan {
   model_version: string;
   created_at: string;
   overlay_png_base64: string | null;
+  vein_grade: string | null;
 }
 
 export interface SiteCheckin {
@@ -30,6 +31,18 @@ export interface SiteCheckin {
   image_url: string;
   roi_bbox: number[] | null;
   risk_score: number;
+  cannula_confidence: number | null;
+  redness_level: number | null;
+  redness_label: string | null;
+  reddened_fraction: number | null;
+  spread_hub_widths: number | null;
+  skin_visible_fraction: number | null;
+  baseline_reddened_fraction: number | null;
+  change_since_baseline: number | null;
+  overlay_png_base64: string | null;
+  vip_score: number | null;
+  risk_velocity: string | null;
+  clinical_explanation: string[] | null;
   delta_from_previous: number;
   color_distance: number | null;
   alert_triggered: boolean;

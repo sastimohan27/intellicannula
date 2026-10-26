@@ -76,6 +76,7 @@ async def create_vein_scan(
 
     response = VeinScanOut.model_validate(scan)
     response.overlay_png_base64 = result["overlay_png_base64"]
+    response.vein_grade = _calculate_vein_grade(result["insertion_x"], result["vein_width_px"])
     return response
 
 
@@ -84,10 +85,32 @@ def list_vein_scans(
     patient_id: int,
     patient: Patient = Depends(require_patient),
     db: Session = Depends(get_db),
-) -> list[VeinScan]:
-    return (
+) -> list[VeinScanOut]:
+    scans = (
         db.query(VeinScan)
         .filter(VeinScan.patient_id == patient_id)
         .order_by(VeinScan.created_at.desc())
         .all()
     )
+    result = []
+    for scan in scans:
+        out = VeinScanOut.model_validate(scan)
+        out.vein_grade = _calculate_vein_grade(scan.insertion_x, scan.vein_width_px)
+        result.append(out)
+    return result
+
+
+def _calculate_vein_grade(insertion_x: int | None, width: float | None) -> str:
+    """Grade the chosen vein by its apparent width (px at 512x512).
+
+    Deliberately not based on `confidence`: that is the selector's margin of the
+    best segment over the runner-up, so an arm with several good veins scores
+    *low* confidence. Grading on it marked a 13.8 px vein "Not Recommended".
+    """
+    if insertion_x is None or width is None:
+        return "Not Recommended"
+    if width > 12.0:
+        return "Grade A (Excellent)"
+    if width > 8.0:
+        return "Grade B (Moderate)"
+    return "Grade C (Difficult)"

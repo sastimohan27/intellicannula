@@ -6,11 +6,24 @@ models so a response can be built straight from a row.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Annotated
 
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
+
+
+def _assume_utc(value: datetime) -> datetime:
+    """SQLite drops tzinfo; every stored time is UTC (models._utcnow).
+
+    Without this the API emitted naive ISO strings, which browsers parse as
+    *local* time - the chart showed times 5.5 h early in IST.
+    """
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+UTCDateTime = Annotated[datetime, AfterValidator(_assume_utc)]
 
 
 class PatientCreate(BaseModel):
@@ -24,7 +37,7 @@ class PatientOut(BaseModel):
     id: int
     name: str
     mrn: str
-    created_at: datetime
+    created_at: UTCDateTime
 
 
 class VeinScanOut(BaseModel):
@@ -47,9 +60,10 @@ class VeinScanOut(BaseModel):
     angle_deg: float | None = None
     vein_width_px: float | None = None
     confidence: float
+    vein_grade: str | None = None
     reason: str | None = None
     model_version: str
-    created_at: datetime
+    created_at: UTCDateTime
 
     # Base64 PNG of the original with mask and marker drawn on. Not persisted -
     # it is regenerated per request so it always matches the stored numbers.
@@ -81,6 +95,19 @@ class SiteCheckinOut(BaseModel):
                 return None
         return value
     risk_score: float
+    cannula_confidence: float | None = None
+    # Redness measurement (response-only; see infection_module/src/erythema.py)
+    redness_level: int | None = None
+    redness_label: str | None = None
+    reddened_fraction: float | None = None
+    spread_hub_widths: float | None = None
+    skin_visible_fraction: float | None = None
+    baseline_reddened_fraction: float | None = None
+    change_since_baseline: float | None = None
+    overlay_png_base64: str | None = None
+    vip_score: int | None = None
+    clinical_explanation: list[str] | None = None
+    risk_velocity: str | None = None
     delta_from_previous: float
     color_distance: float | None = None
     alert_triggered: bool
@@ -88,13 +115,13 @@ class SiteCheckinOut(BaseModel):
     trend: str | None = None
     registration_degraded: bool
     model_version: str
-    created_at: datetime
+    created_at: UTCDateTime
 
 
 class HistoryPoint(BaseModel):
     """One point on the risk trend chart."""
 
-    timestamp: datetime
+    timestamp: UTCDateTime
     risk_score: float
     delta_from_previous: float
     color_distance: float | None = None
@@ -117,7 +144,7 @@ class AlertMessage(BaseModel):
     risk_score: float
     reason: str
     trend: str
-    created_at: datetime
+    created_at: UTCDateTime
 
 
 class ErrorDetail(BaseModel):
