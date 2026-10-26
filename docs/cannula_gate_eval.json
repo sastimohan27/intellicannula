@@ -1,0 +1,66 @@
+{
+  "synthetic_val_threshold_sweep": {
+    "0.30": {
+      "false_rejection": 0.0,
+      "false_acceptance": 0.2,
+      "n_pos": 10,
+      "n_neg": 5
+    },
+    "0.40": {
+      "false_rejection": 0.0,
+      "false_acceptance": 0.2,
+      "n_pos": 10,
+      "n_neg": 5
+    },
+    "0.50": {
+      "false_rejection": 0.0,
+      "false_acceptance": 0.0,
+      "n_pos": 10,
+      "n_neg": 5
+    },
+    "0.60": {
+      "false_rejection": 0.0,
+      "false_acceptance": 0.0,
+      "n_pos": 10,
+      "n_neg": 5
+    },
+    "0.70": {
+      "false_rejection": 0.3,
+      "false_acceptance": 0.0,
+      "n_pos": 10,
+      "n_neg": 5
+    }
+  },
+  "synthetic_test_at_0.50": {
+    "false_rejection": 0.05263157894736842,
+    "false_acceptance": 0.0,
+    "n_pos": 19,
+    "n_neg": 6
+  },
+  "real_images_without_cannula": {
+    "cubital_nir_forearms": {
+      "n": 200,
+      "false_acceptance_at_0.50": 0.01,
+      "unable_to_verify_0.25_0.50": 0.19,
+      "max_confidence": 0.5532788634300232
+    },
+    "azh_wounds": {
+      "n": 100,
+      "false_acceptance_at_0.50": 0.01,
+      "unable_to_verify_0.25_0.50": 0.02,
+      "max_confidence": 0.5093788504600525
+    },
+    "medetec_wounds": {
+      "n": 100,
+      "false_acceptance_at_0.50": 0.02,
+      "unable_to_verify_0.25_0.50": 0.05,
+      "max_confidence": 0.6306271553039551
+    }
+  },
+  "real_photos_confidence": {
+    "iv_dressing_photo": 0.786,
+    "iv_hand_photo": 0.191,
+    "landscape_no_cannula": 0.236
+  },
+  "note": "No labelled real cannula dataset exists for this project; real-photo false-rejection cannot be estimated beyond the individual photos listed."
+}

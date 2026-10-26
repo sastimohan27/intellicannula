@@ -184,7 +184,7 @@ performance here is the honest estimate of how the risk model travels.
 
 1. **No public RGB vein dataset with masks exists.** Both vein datasets are NIR.
    This is the single fact driving the camera-modality decision — see
-   `README.md` § Camera modality.
+   `README.md` § Imaging modality and hardware.
 2. **No public cannula-detection dataset.** Phase 4 needs ~100–200 hand-labelled
    images; see `docs/labeling_guide.md` (written in Phase 4).
 3. **No public longitudinal IV-site dataset.** Nothing here has the same site

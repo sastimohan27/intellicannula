@@ -62,6 +62,12 @@ class VeinScanOut(BaseModel):
     confidence: float
     vein_grade: str | None = None
     reason: str | None = None
+    # Response-only: NIR provenance and timing (see app/core/modality.py)
+    modality_status: str | None = None
+    acquisition_source: str | None = None
+    dataset_split: str | None = None
+    mask_png_base64: str | None = None
+    inference_ms: float | None = None
     model_version: str
     created_at: UTCDateTime
 
@@ -105,6 +111,14 @@ class SiteCheckinOut(BaseModel):
     baseline_reddened_fraction: float | None = None
     change_since_baseline: float | None = None
     overlay_png_base64: str | None = None
+    baseline_overlay_png_base64: str | None = None
+    baseline_checkin_id: int | None = None
+    baseline_created_at: UTCDateTime | None = None
+    comparison_status: str | None = None     # baseline | compared | baseline_unusable
+    scene_match_inliers: int | None = None
+    assessment_status: str | None = None
+    assessment_label: str | None = None
+    sample_origin: str | None = None         # uploaded_photo | simulated_demo
     vip_score: int | None = None
     clinical_explanation: list[str] | None = None
     risk_velocity: str | None = None

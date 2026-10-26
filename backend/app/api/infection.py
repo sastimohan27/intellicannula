@@ -17,6 +17,7 @@ from app.core.ml import ModelNotAvailable, run_site_check
 from app.core.storage import get_store, sha256_bytes
 from app.models import Patient, SiteCheckin
 from app.schemas import AlertMessage, SiteCheckinOut
+from app.schemas.schemas import _assume_utc
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/patients", tags=["infection"])
@@ -111,6 +112,18 @@ async def create_site_check(
         response.spread_hub_widths = redness["spread_hub_widths"]
         response.skin_visible_fraction = redness["skin_fraction"]
     response.baseline_reddened_fraction = result.get("baseline_reddened_fraction")
+    response.baseline_overlay_png_base64 = result.get("baseline_overlay_png_base64")
+    response.comparison_status = result.get("comparison_status")
+    response.scene_match_inliers = result.get("scene_match_inliers")
+    response.sample_origin = result.get("sample_origin")
+    if previous:
+        response.baseline_checkin_id = previous[0].id
+        # Assigned after validation, so the UTC normalisation must be explicit.
+        response.baseline_created_at = _assume_utc(previous[0].created_at)
+    response.assessment_status, response.assessment_label = _assessment(
+        result.get("comparison_status"), result.get("change_since_baseline"),
+        redness, alert,
+    )
     response.change_since_baseline = result.get("change_since_baseline")
     response.overlay_png_base64 = result.get("overlay_png_base64")
     response.risk_velocity = _format_risk_velocity(delta)
@@ -129,9 +142,9 @@ def _evaluate_alert(risk: float, delta: float, history: list[float]) -> tuple[bo
     """
     reasons = []
     if risk > RISK_THRESHOLD:
-        reasons.append(f"risk {risk:.2f} exceeds {RISK_THRESHOLD}")
+        reasons.append(f"redness score {risk:.2f} exceeds {RISK_THRESHOLD}")
     if delta > DELTA_THRESHOLD:
-        reasons.append(f"risk rose {delta:.2f} since last check-in")
+        reasons.append(f"redness score rose {delta:.2f} since last check-in")
 
     run = 0
     for earlier, later in zip(history, history[1:]):
@@ -158,11 +171,40 @@ def _trend(history: list[float]) -> str:
 
 
 def _format_risk_velocity(delta: float) -> str:
-    """Format the change in risk as a clinical trend string."""
+    """Change in the redness score since the previous check-in.
+
+    Previously labelled "/ day", which was wrong: it is per check-in, and two
+    check-ins can be minutes or days apart.
+    """
     if abs(delta) < 0.05:
-        return "Stable"
+        return "stable since last check-in"
     direction = "+" if delta > 0 else ""
-    return f"{direction}{delta:.2f} / day"
+    return f"{direction}{delta:.2f} since last check-in"
+
+
+# Change since baseline (percentage points of reddened ring skin) that counts as
+# "visible change". Same documented, unvalidated basis as erythema.LEVELS.
+VISIBLE_CHANGE = 0.10
+
+
+def _assessment(
+    comparison: str | None, change: float | None, redness: dict | None, alert: bool
+) -> tuple[str, str]:
+    """Status for the clinician. Never a diagnosis; no "urgent" tier.
+
+    An "urgent assessment" status would need a clinically reviewed escalation
+    protocol, which this prototype does not have, so the strongest status is
+    "review recommended".
+    """
+    if alert:
+        return "review_recommended", "Review recommended"
+    if comparison == "baseline":
+        return "baseline_recorded", "Baseline recorded"
+    if comparison == "baseline_unusable" or change is None:
+        return "unable_to_compare", "Image accepted - unable to compare with baseline"
+    if change >= VISIBLE_CHANGE or (redness and redness["redness_level"] >= 2):
+        return "visible_change", "Visible change detected"
+    return "no_significant_change", "No significant visible change"
 
 
 def _explain(
@@ -187,12 +229,15 @@ def _explain(
             "naturally redder skin (e.g. on the hand) is not mistaken for change."
         )
     elif change is None:
-        lines.append("The baseline photo has no detectable cannula, so change since "
-                     "insertion cannot be computed.")
+        lines.append("The baseline photo has no verified cannula, so change since "
+                     "insertion cannot be computed. Start a new baseline for this site.")
     else:
         lines.append(f"Change since baseline: {change * 100:+.0f} percentage points of reddened skin.")
     if trend == "worsening":
         lines.append("Redness is rising across recent check-ins.")
+    lines.append(
+        "Visible redness or a change score alone cannot confirm or exclude infection."
+    )
     lines.append(
         f"Only {redness['skin_fraction']:.0%} of the ring around the hub is visible skin; "
         "dressing, tape and plastic are excluded from the measurement."

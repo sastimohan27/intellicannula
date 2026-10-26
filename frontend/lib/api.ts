@@ -1,5 +1,6 @@
 import axios from "axios";
-import type { Patient, PatientHistory, SiteCheckin, VeinScan } from "./types";
+import { rewriteApiUrl } from "./timeline";
+import type { ModelInfo, NirStatus, Patient, PatientHistory, SiteCheckin, VeinScan } from "./types";
 
 /**
  * API base URL. A configured `localhost` URL is rewritten to the host the page
@@ -8,13 +9,7 @@ import type { Patient, PatientHistory, SiteCheckin, VeinScan } from "./types";
  */
 function resolveApiUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-  if (typeof window === "undefined") return configured;
-  const url = new URL(configured);
-  const page = window.location.hostname;
-  if (["localhost", "127.0.0.1"].includes(url.hostname) && !["localhost", "127.0.0.1"].includes(page)) {
-    url.hostname = page;
-  }
-  return url.origin;
+  return rewriteApiUrl(configured, typeof window === "undefined" ? null : window.location.hostname);
 }
 
 export const API_URL = resolveApiUrl();
@@ -66,6 +61,12 @@ export const postVeinScan = (id: number, file: File) =>
 
 export const postSiteCheck = (id: number, file: File) =>
   call<SiteCheckin>(() => upload(`/patients/${id}/site-check`, file));
+
+export const getModels = () =>
+  call<ModelInfo>(() => client.get("/models"));
+
+export const getNirStatus = () =>
+  call<NirStatus>(() => client.get("/modality/nir"));
 
 export const alertsSocketUrl = () =>
   `${API_URL.replace(/^http/, "ws")}/ws/alerts`;

@@ -25,6 +25,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from infection_module.src.cannula_detector.generate_dataset import (  # noqa: E402
@@ -32,6 +33,10 @@ from infection_module.src.cannula_detector.generate_dataset import (  # noqa: E4
 )
 
 DAYS = [(1, 0.0, "baseline"), (2, 9.0, "mild"), (3, 18.0, "spreading")]
+
+# Read by the API (app/core/ml.py::sample_origin) so a result from these files
+# is labelled "simulated demo sample" regardless of what the file is renamed to.
+SIMULATED_KEY = "IntelliCannula-Simulated"
 
 
 def composite_hub(bg: np.ndarray, centre: tuple[int, int], width_frac: float) -> tuple[np.ndarray, list[float]]:
@@ -78,7 +83,11 @@ def main() -> None:
     for day, amount, tag in DAYS:
         img = day1 if amount == 0 else redden(day1, centre, amount, sigma)
         path = out / f"SIMULATED_day{day}_{tag}.png"
-        cv2.imwrite(str(path), img)
+        meta = PngInfo()
+        meta.add_text(SIMULATED_KEY, "true")
+        meta.add_text("Description", f"SIMULATED day {day}: procedural cannula hub; "
+                      f"{amount:g} CIELAB a* units of artificial redness added. Not patient data.")
+        Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)).save(path, pnginfo=meta)
         print(path)
 
 

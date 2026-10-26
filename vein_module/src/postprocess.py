@@ -28,3 +28,20 @@ def remove_small_components(binary: np.ndarray, min_area: int) -> np.ndarray:
 def binarize(probs: np.ndarray, threshold: float, min_area: int) -> np.ndarray:
     """Threshold a probability map, then remove speckle."""
     return remove_small_components(probs > threshold, min_area)
+
+
+def hysteresis(probs: np.ndarray, high: float, low: float, min_area: int) -> np.ndarray:
+    """Keep low-threshold pixels only where they connect to a high-threshold seed.
+
+    Aimed at thin veins: their faint continuations fall below a single strict
+    threshold, while isolated low-probability speckle has no confident seed.
+    Experimental - see vein_module/src/postprocess_experiments.py for whether
+    it is adopted.
+    """
+    weak = (probs > low).astype(np.uint8)
+    strong = probs > high
+    n, labels = cv2.connectedComponents(weak, connectivity=8)
+    keep = np.zeros(n, dtype=bool)
+    keep[np.unique(labels[strong])] = True
+    keep[0] = False
+    return remove_small_components(keep[labels], min_area)

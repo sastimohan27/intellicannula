@@ -2,15 +2,19 @@
 
 import { useRef, useState } from "react";
 
-/** Camera-or-file capture. `capture="environment"` opens the rear camera on mobile. */
+/**
+ * File upload, optionally opening the rear camera on mobile (`camera`).
+ * The vein scan passes camera={false}: a phone camera is RGB, not NIR.
+ */
 export default function UploadCard({
-  title, description, buttonLabel, onUpload, disabled,
+  title, description, buttonLabel, onUpload, disabled, camera = false,
 }: {
   title: string;
   description: string;
   buttonLabel: string;
   onUpload: (file: File) => Promise<void>;
   disabled?: boolean;
+  camera?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -39,7 +43,7 @@ export default function UploadCard({
         ref={inputRef}
         type="file"
         accept="image/png,image/jpeg,image/webp"
-        capture="environment"
+        capture={camera ? "environment" : undefined}
         className="hidden"
         onChange={(e) => handle(e.target.files?.[0])}
       />

@@ -126,8 +126,10 @@ def measure(bgr: np.ndarray, hub_bbox: list[float]) -> dict:
         )
     reference = candidates & (r >= cutoff)
 
-    a = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)[..., 1].astype(np.float32) - 128.0
+    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+    a = lab[..., 1] - 128.0
     ref_a = float(np.median(a[reference]))
+    ref_b = float(np.median(lab[..., 2][reference] - 128.0))
     delta_a = a - ref_a
     red = ring_skin & (delta_a > RED_DELTA_A)
 
@@ -141,6 +143,7 @@ def measure(bgr: np.ndarray, hub_bbox: list[float]) -> dict:
         "spread_hub_widths": spread / 2.0,   # r is in half-sizes
         "skin_fraction": skin_fraction,
         "reference_a": ref_a,
+        "reference_b": ref_b,
         "reference_distance_hub_widths": cutoff / 2.0,
         "redness_level": level,
         "redness_label": label,

@@ -10,6 +10,7 @@ boto3==1.35.90
 websockets==14.1
 alembic==1.14.0
 numpy==2.1.3            # used by the ML bridge and trend maths
+pillow==12.3.0           # upload validation and NIR provenance (EXIF)
 
 # NOTE: serving predictions also needs the ML module dependencies (torch,
 # opencv, lightgbm, scikit-image). Those are NOT listed here on purpose - they

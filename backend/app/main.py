@@ -93,6 +93,27 @@ def health() -> dict[str, str]:
     return {"status": "ok", "version": settings.api_version}
 
 
+@app.get("/modality/nir", tags=["meta"])
+def nir_status() -> dict[str, object]:
+    """What the vein-scan workflow will accept, so the UI can say so honestly."""
+    from app.core.modality import dataset_registry
+
+    devices = settings.nir_devices
+    return {
+        "registered_devices": sorted(devices),
+        # Raw and processed copies of a frame hash differently; count frames.
+        "dataset_frames": len({row["frame"] for row in dataset_registry().values()}),
+        "live_capture_available": bool(devices),
+        "phone_camera_is_nir": False,
+        "accepted_sources": ["registered_device", "cubital_dataset"],
+        "note": (
+            "Ordinary phone cameras capture RGB and are not accepted for vein scans. "
+            "A vein scan needs an image from a registered NIR device or a verified "
+            "CUBITAL NIR frame."
+        ),
+    }
+
+
 @app.get("/models", tags=["meta"])
 def model_versions() -> dict[str, object]:
     """Which model versions are live, and whether their weights are present.

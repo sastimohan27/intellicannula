@@ -40,7 +40,7 @@ def _load_model(weights: Path):
 
 
 def detect_cannula(
-    image_path: str | Path,
+    image_path: str | Path | np.ndarray,
     conf_threshold: float = 0.4,
     weights: Path | None = None,
 ) -> dict | None:
@@ -52,7 +52,10 @@ def detect_cannula(
     for a retake rather than measure a region that may not contain the site.
     """
     model = _load_model(weights or DEFAULT_WEIGHTS)
-    results = model.predict(str(image_path), conf=conf_threshold, verbose=False)
+    # A BGR ndarray (OpenCV convention, which ultralytics expects) is passed
+    # through, so the API need not write a temporary file per request.
+    source = image_path if isinstance(image_path, np.ndarray) else str(image_path)
+    results = model.predict(source, conf=conf_threshold, verbose=False)
 
     best = None
     for result in results:
@@ -65,7 +68,7 @@ def detect_cannula(
                 }
 
     if best is None:
-        log.info("no cannula hub above conf=%.2f in %s", conf_threshold, image_path)
+        log.info("no cannula hub above conf=%.2f", conf_threshold)
     return best
 
 

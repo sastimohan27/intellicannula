@@ -93,6 +93,18 @@ def mock_vein(monkeypatch):
         }
 
     monkeypatch.setattr(vein, "run_vein_scan", fake)
+    _stub_nir(monkeypatch)
+
+
+def _stub_nir(monkeypatch):
+    """These fixtures test the API contract with the ML mocked, so the NIR
+    provenance check is stubbed too. tests/test_modality.py runs the real one."""
+    from app.api import vein
+
+    monkeypatch.setattr(vein, "verify_nir", lambda *_a: {
+        "status": "verified", "source": "registered_device", "device_id": "test",
+        "dataset_split": None,
+    })
 
 
 @pytest.fixture
@@ -110,6 +122,7 @@ def mock_vein_refuses(monkeypatch):
         }
 
     monkeypatch.setattr(vein, "run_vein_scan", fake)
+    _stub_nir(monkeypatch)
 
 
 @pytest.fixture

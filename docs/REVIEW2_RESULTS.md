@@ -1,146 +1,192 @@
-# Review 2 — Detection Correctness: What Was Wrong, What Changed, Measured Results
+# IntelliCannula — Final Review: Changes, Measured Results, Limitations
 
-All numbers below were produced by `vein_module/src/evaluate.py` on the
-held-out **test split (302 images, 288 with an annotated vein; subjects
-disjoint from training)**. The before/after rows were run with the same code
-and the same images.
+Every number here was measured in this repository; the command that produced
+it is given. Historical baselines are kept so before/after is visible.
+Detail: [`vein_error_analysis.md`](vein_error_analysis.md) ·
+raw data: [`vein_postprocess_experiments.json`](vein_postprocess_experiments.json),
+[`vein_error_analysis.json`](vein_error_analysis.json),
+[`cannula_gate_eval.json`](cannula_gate_eval.json).
 
-## 1. Problems found (audit)
+## 1. Problems found and fixed
 
-| # | Symptom | Root cause |
+| # | Symptom | Root cause | Fix |
+|---|---|---|---|
+| 1 | Vein mask was blobs + speckle; 74% of marked pixels not vein | Training stopped at epoch 6/25; fixed 0.5 threshold | Resumed to epoch 16; threshold 0.9 + 60 px speckle filter tuned on val |
+| 2 | Clear 13.8 px vein graded "Not Recommended" | Grade used the selector's *separation* margin | Grade from vein width; refusal → "Not Recommended" |
+| 3 | Landscape photo scored infection risk 0.999 | No cannula → silently scored image centre | Strict cannula gate; no fallback region |
+| 4 | Every site photo scored ~1.00 | LightGBM trained on *chronic wound vs normal skin* (proxy labels) | Replaced by measured peri-cannula redness vs patient's baseline |
+| 5 | Any image accepted for vein scanning, incl. RGB phone photos | No modality check | **NIR provenance gate** (§3) — RGB never reaches the model |
+| 6 | Follow-up of a different scene compared as if same site | No scene check | Landmark (ORB/RANSAC) match against baseline; < 50 → refused |
+| 7 | Site check took 1.7–2.8 s per detection | Detector ran in a fresh subprocess per request | In-process, cached model: 42 ms |
+| 8 | Vein model on CPU, 597 ms forward pass | Default device | MPS: 77 ms, identical masks (40/40 test images, Dice 1.0000) |
+| 9 | Chart times 5.5 h early (IST) | API emitted UTC without "Z" | UTC normalisation; regression tests |
+| 10 | "+0.89 / day" trend | Per-check-in change labelled per day | "+0.89 since last check-in" |
+| 11 | Fake "VIP score" | Risk number relabelled | Removed; VIP needs signs a photo cannot show |
+| 12 | Dashboard claimed Dice 0.37, LightGBM F1 0.988, "mAP 0.995 (Trained)" | Stale hard-coded text | Live versions from `/models` + measured results with caveats |
+
+## 2. Vein segmentation
+
+**Experiments (validation split only, 285 images with a vein, epoch-16 checkpoint):**
+
+| Configuration | Dice | Precision | Recall | |
+|---|---:|---:|---:|---|
+| **thr 0.90, min 60 px (deployed)** | **0.575** | 0.501 | 0.759 | kept |
+| thr 0.95 | 0.592 | 0.557 | 0.701 | higher Dice, but 6 pts more vein missed — not adopted |
+| thr 0.85 | 0.562 | 0.473 | 0.788 | worse |
+| flip TTA, thr 0.90 | 0.580 | 0.515 | 0.748 | +0.005 for 2× latency — not adopted |
+| hysteresis 0.9/0.5 · 0.9/0.7 | 0.517 · 0.540 | 0.399 · 0.434 | 0.856 · 0.826 | worse |
+
+**No inference-time change was established as an improvement worth adopting**,
+so the deployed configuration and its single test evaluation are unchanged.
+
+**Test split (288 images with a vein; subjects disjoint from training):**
+
+| Metric | Original (epoch 6, thr 0.5) | Final (epoch 16, thr 0.9, min 60 px) |
+|---|---:|---:|
+| Dice | 0.370 | **0.567** (median 0.610, P10 0.350, P90 0.741) |
+| IoU | 0.239 | **0.413** |
+| Precision | 0.262 | **0.495** |
+| Recall | 0.814 | 0.758 |
+
+**Errors:** 47% of false-positive pixels are within 2 px of a true vein (drawn
+too wide), 53% on the arm away from annotated veins, 0.3% off the arm. Thin-vein
+recall 0.70 vs 0.76 for wider veins. Veins are often fragmented (median 1.5
+predicted pieces per annotated vein). High-contrast frames score *lowest* (0.536
+vs 0.591 for low contrast), and the worst case shows a clear vein the annotation
+omits — some "false positives" are likely unannotated veins (hypothesis; needs
+re-annotation to measure).
+
+**Integrity:** 0 subjects and 0 identical images shared between splits; 0
+mask-pairing errors (veins outside the annotated arm).
+
+**Latency (Apple MPS):** model forward 77 ms; vein pipeline in the API 88–127 ms
+warm; whole request 185 ms warm, 3.4 s on the first request (model load +
+NIR-registry build).
+
+Commands: `python -m vein_module.src.postprocess_experiments` (val),
+`python -m vein_module.src.error_analysis` (test, analysis only).
+
+## 3. NIR-only vein scanning
+
+Pixel statistics **cannot** establish NIR here: CUBITAL's NIR camera renders a
+purple tint, and its colour spread (CIELAB chroma SD median 10.2) overlaps RGB
+photos (5th pct 2.8, median 7.5). So acceptance is by **provenance**
+(`backend/app/core/modality.py`):
+
+| Input | Result |
+|---|---|
+| SHA-256 matches a local CUBITAL NIR frame | **verified** — `cubital_dataset`, with its split (train/val/test) |
+| `X-NIR-Device` + matching `X-NIR-Device-Token` (server-side registry, env `NIR_DEVICES`) | **verified** — `registered_device` |
+| File has camera EXIF (Make/Model), e.g. a phone photo | **rejected** — "not accepted for vein segmentation… RGB camera" |
+| Anything else (grayscale, "NIR" filename, device ID without token…) | **rejected** — "NIR compatibility unverified" |
+
+The model is never called on a rejection (asserted in `tests/test_modality.py`).
+No live NIR device is attached to this prototype, so only verified dataset
+frames are accepted today; the UI states this (`/modality/nir`). The vein upload
+does not open the phone camera — a phone camera is RGB.
+
+## 4. Cannula gate (`docs/cannula_gate_eval.json`)
+
+States: ≥ 0.50 verified · 0.25–0.50 "unable to verify" (rejected, says so) · < 0.25 no cannula.
+
+| Data | n | False acceptance at 0.50 | False rejection at 0.50 |
+|---|---:|---:|---:|
+| Synthetic val (threshold comparison only) | 10 pos / 5 neg | 0% (0.3–0.4: 20%) | 0% (0.7: 30%) |
+| Synthetic test | 19 / 6 | 0% | 5% (1/19) |
+| Real, no cannula — CUBITAL forearms | 200 | **1%** (+19% "unable to verify") | — |
+| Real, no cannula — AZH wounds | 100 | **1%** | — |
+| Real, no cannula — Medetec wounds | 100 | **2%** | — |
+| Real IV photos | 2 | — | dressing 0.79 accepted; hand 0.19 **missed** |
+
+This corrects the earlier "0 of 121" figure, which came from a smaller sample.
+A false acceptance on a *follow-up* is still stopped by the scene check (§5);
+on a *baseline* photo it is not. No labelled real cannula set exists, so
+real-world false rejection is unmeasured beyond the photos listed. AZH/Medetec
+images were also used as backgrounds for the synthetic training set.
+
+## 5. Site-change monitoring
+
+Pipeline: quality gate (resolution, blur, darkness, overexposure) → cannula gate
+→ redness in a skin ring around the hub (`infection_module/src/erythema.py`) →
+comparison with the patient's baseline.
+
+**Safeguards:** missing/unusable baseline → "unable to compare"; different scene
+(< 50 RANSAC landmark matches) → refused. Measured: same scene incl. moved,
+rotated 8° and re-saved JPEG 881–1,865 matches; unrelated scenes ≤ 11. Real
+day-to-day photos will vary more than this simulated set — the threshold needs
+checking on real follow-ups. Uniform lighting/white-balance shifts are cancelled
+by the in-photo reference (functional test).
+
+**Statuses:** Baseline recorded · No significant visible change · Visible
+change detected (≥ +10 pts or level ≥ 2) · Review recommended (alert) · Unable
+to compare. There is deliberately no "urgent" tier: that needs a clinically
+reviewed escalation protocol.
+
+**Simulated sequence** (procedural hub on a real limb photo, redness added;
+each PNG carries an `IntelliCannula-Simulated` marker so renaming cannot hide it):
+
+| Day | Reddened | Change | Score | Status |
+|---|---:|---:|---:|---|
+| 1 | 5% | — | 0.11 | Baseline recorded |
+| 2 | 12% | +7 pts | 0.25 | No significant visible change |
+| 3 | 58% | +52 pts | 1.00 | Review recommended (alert) |
+
+This shows the pipeline responds correctly; it is **not** evidence of detecting
+real phlebitis.
+
+## 6. Tests (all executed)
+
+| Suite | Command | Result |
 |---|---|---|
-| 1 | Vein mask was thick blobs + speckle; ~74% of highlighted pixels were not vein | Model stopped at **epoch 6 of 25** (val Dice still rising); fixed 0.5 threshold; no speckle removal |
-| 2 | A clear 13.8 px vein graded **"Not Recommended"** | Grade used `confidence`, which is the *margin between the best and runner-up candidate* — several good veins → low margin → bad grade |
-| 3 | A **landscape photo** got infection risk **0.999** | When no cannula was detected (or the detector crashed), the code silently scored the image centre |
-| 4 | "Cannot reach the API" on vein upload | API ran in a venv without OpenCV; the crash (500) had no CORS headers, so the browser reported a network error |
-| 5 | Chart tooltip showed `index` and an unnamed value | A `Scatter` series inside the `LineChart` added its own tooltip rows |
+| API | `cd backend && ../infection_module/.venv/bin/python -m pytest -q` | **66 passed** (39 original + 27 new) |
+| ML modules | `infection_module/.venv/bin/python -m pytest -q` | **188 passed** |
+| Frontend unit | `cd frontend && npm test` | **5 passed** |
+| Frontend static | `npx tsc --noEmit` · `npx eslint app components lib tests` | clean |
+| End-to-end demo | `infection_module/.venv/bin/python scripts/run_demo.py` | **6/6 steps** pass, 3 check-ins stored |
 
-## 2. Fixes
+The original 39 API tests are unchanged in their bodies; their mocked-ML
+fixtures now also stub the NIR check (documented in `conftest.py`), and
+`test_modality.py` exercises the real check. UI verified by driving headless
+Chrome through the real upload inputs (results and rejection screens).
 
-**Vein segmentation**
-- Resumed training (added `--resume` to `train.py`) from epoch 6 → best checkpoint **epoch 16** (val Dice 0.353 → 0.475; epochs 17–19 did not improve as the cosine learning rate reached ~0).
-- Post-processing in one shared module, `vein_module/src/postprocess.py`, used by **both** the API and the evaluator, so reported metrics are measured on exactly the mask the API serves:
-  probability threshold **0.9**, drop connected blobs **< 60 px**.
-- Both values were tuned on the **validation** split, never on test. 150 px scored marginally higher on val (0.601 vs 0.590) but deletes short genuine veins, so 60 px was kept.
-- Checked where the false positives are: with the retrained model, **0% of false-positive pixels fall off the arm** (measured against CUBITAL's arm label). The bedsheet false positives in the earlier report are gone; the remaining errors are vein margins and faint unlabelled veins.
-
-**Vein grade** — now based on vein width only; "Not Recommended" only when no site exists. Confidence is shown separately with its reason (e.g. "6 candidates scored similarly").
-
-**Cannula — strict gate**
-- A site check is scored **only if the detector finds a hub at confidence ≥ 0.5**. Otherwise the API returns **422 "No cannula detected… retake"** and nothing is stored.
-- No centre-of-image fallback. Missing or crashing detector → **503**, never a guess.
-- The threshold of 0.5 was chosen from measurements on images with no cannula (below).
-
-**Engineering** — missing ML dependencies return 503 with the fix instead of a fake network error; tooltip fixed; regression tests added (API 39/39, modules 188/188 pass).
-
-## 3. Results
-
-### Vein segmentation (test split, 288 images with a vein)
-
-| Metric | Before (epoch 6, thr 0.5) | Epoch 13 | **Final (epoch 16, thr 0.9, min 60 px)** | Change |
-|---|---:|---:|---:|---:|
-| **Dice** | 0.370 | 0.557 | **0.567** | +53% |
-| **IoU** | 0.239 | 0.403 | **0.413** | +73% |
-| **Precision** | 0.262 | 0.482 | **0.495** | +89% |
-| Recall | 0.814 | 0.751 | 0.758 | −0.06 |
-
-Reading it: precision nearly doubled — the system now highlights far fewer
-non-vein pixels. Recall dropped slightly: the stricter threshold misses some
-faint vein edges. That trade is deliberate for a tool whose output a
-clinician looks at.
-
-### Non-vein images (no hallucinated veins)
-
-Uploaded to the vein-scan endpoint: a landscape photo, a real IV-hand photo, a
-wound photo → **no site returned for any of them**. Landscape and wound:
-"empty mask — no veins segmented". IV hand: a few small fragments, rejected
-because "no segment met the minimum bar".
-
-### Cannula detector — images with **no** cannula (top confidence)
-
-| Image set | n | ≥ 0.4 (old threshold) | ≥ 0.5 (new) | Max |
-|---|---:|---:|---:|---:|
-| CUBITAL forearm NIR | 40 | 2 | **0** | 0.474 |
-| Medetec wound photos | 40 | 0 | 0 | 0.157 |
-| AZH wound photos | 40 | 0 | 0 | 0.098 |
-| Landscape photo | 1 | 0 | 0 | 0.236 |
-
-Real IV photos: dressing photo **detected (0.79)**; hand photo **missed (0.19)** → rejected with "retake", not scored.
-
-## 3b. Infection monitoring — redesigned
-
-**Problem found:** every site check scored ~1.00, including a clean IV-hand
-photo (0.999). The LightGBM model was trained on AZH close-up *chronic wounds vs
-normal skin*, so any IV photo — tape, plastic hub, dressing — looked "not normal
-skin". It answered "is this a wound?", not "is this site reddening?". The
-"VIP score" was that number relabelled; real VIP also needs pain, swelling and a
-palpable cord, which a photo cannot show.
-
-**Replacement** (`infection_module/src/erythema.py`): measure the visible sign of
-phlebitis directly — redness spreading from the insertion point.
-
-1. Photo-quality gate: blurred, too dark or overexposed → retake.
-2. Cannula gate (≥ 0.5) → hub box.
-3. Ring of skin 0.75–5 hub half-sizes around the hub; YCrCb skin mask removes
-   tape, dressing, plastic and background.
-4. Reference = median a\* of the farthest 30% of visible skin in the same photo
-   (cancels lighting and skin tone).
-5. Reddened = ring skin with Δa\* > 6 (CIELAB units; above the ~2–3 unit
-   just-noticeable difference). Score = reddened share, saturating at 50%.
-6. The day-0 photo is measured the same way; change since baseline is a
-   difference of two measurements, so no fragile image warping is needed.
-
-**Functional tests** (`infection_module/tests/test_erythema.py`, 7 pass): clean
-site reads 0; score rises monotonically with added redness; a uniform tone shift
-is not redness; tape and hub plastic are excluded; a site with no visible skin
-is refused.
-
-**One bug the functional test caught:** with the reference band at 2.5–3.5
-hub-sizes, spreading redness reddened the reference too and the score *fell* as
-redness was added. The reference now uses the farthest skin in the photo.
-
-**Simulated 3-day sequence** (drawn hub on a real limb photo; redness added —
-files are named `SIMULATED_*`):
-
-| Day | Reddened skin | Change | Score | Level | Alert |
-|---|---:|---:|---:|---|---|
-| 1 (baseline) | 5% | — | 0.11 | No visible redness | no |
-| 2 | 12% | +7 pts | 0.25 | Mild | no |
-| 3 | 58% | +52 pts | 1.00 | Extensive | **yes** |
-
-This shows the pipeline responds correctly. It is **not** evidence that it
-detects real phlebitis — that needs nurse-scored photos of real IV sites.
-
-## 4. Limitations (stated honestly)
-
-- **Cannula detector is trained on 90 synthetic images** (procedurally drawn hubs on real skin). Its 0.995 mAP is on synthetic data and does not transfer; it misses some real cannulas. Real labelled photos are the next step. The gate means a miss produces a retake request, not a wrong score.
-- Vein model plateaued at epoch 16 (val Dice flat through epoch 19). Further gains need more or better data, not more epochs. The run can still be continued with `python -m vein_module.src.train --epochs 25 --patience 8 --resume vein_module/models/resume_from.pt`. Re-tune the threshold afterwards.
-- CUBITAL is a **paediatric NIR** cohort (age 5–22). Ordinary RGB photos do not show subsurface veins the same way; results on RGB are not claimed.
-- "Empty masks correctly left blank" on the 14 vein-free test images is 0% (epoch 16; 7% at epoch 13) — the model still marks something on most images with no labelled vein.
-- Redness thresholds (Δa\* > 6, levels at 10/25/50%) are documented heuristics,
-  not clinically calibrated. A close-up photo with no normal skin away from the
-  site is refused; diffuse redness filling the whole frame reads low against
-  itself, which is why the day-0 baseline matters.
-- Needle angle is a heuristic proxy, not a depth measurement. All outputs are advisory decision support, not clinical recommendations.
-
-## 5. Demo script
-
-Demo images: `~/Desktop/IntelliCannula_demo/`. Use a **new patient** (the first
-site photo becomes the baseline).
-
-1. Open `http://localhost:3000` (or `http://<laptop-IP>:3000` on a phone on the
-   same Wi-Fi — the upload buttons open the camera), create a patient.
-2. **Vein scan** → `1_vein_scan_arm.png`: thin vein lines, site on a vein,
-   grade + confidence with reason.
-3. **Site check** → `SIMULATED_day1_baseline.png`: "No visible redness",
-   overlay shows hub (green), measured ring (cyan), counted skin (red).
-4. **Site check** → `SIMULATED_day2_mild.png`, then `SIMULATED_day3_spreading.png`:
-   redness rises, alert fires on day 3, chart climbs.
-5. **Site check** → `3_site_check_landscape_REJECTED.png`: "No cannula detected… retake".
-
-Reproduce the numbers:
+## 7. Demo
 
 ```bash
-infection_module/.venv/bin/python -m vein_module.src.evaluate --threshold 0.9 --min-component-px 60
-cd backend && ../infection_module/.venv/bin/python -m pytest -q
+infection_module/.venv/bin/python scripts/build_demo_set.py   # -> data/demo/ + manifest.json
+infection_module/.venv/bin/python scripts/run_demo.py         # scripted check against the API
 ```
+
+Manually: dashboard → **Create demo patient** (MRN `DEMO-…`) → vein scan
+`1_vein_scan_arm.png` (CUBITAL frame 942, **test split**, median Dice) → site
+check `SIMULATED_day1`, `day2`, `day3` → site check
+`3_site_check_landscape_REJECTED.png` (no cannula) → vein scan
+`4_rgb_photo_for_vein_REJECTED.png` (not NIR).
+
+## 8. Limitations
+
+- Vein segmentation still misses ~24% of annotated vein pixels and half of what
+  it marks is outside the annotation; paediatric NIR cohort (ages 5–22); trained
+  on one capture rig.
+- No NIR capture hardware is attached; phone cameras are RGB and cannot be used
+  for vein scans.
+- Cannula detector: 90 synthetic training images; 1–2% false acceptance on real
+  no-cannula images; misses some real cannulas.
+- Redness thresholds and statuses are documented heuristics, not clinically
+  validated; redness alone cannot confirm or exclude infection.
+- Scene-match threshold validated only on simulated/transformed images.
+- Patient records are not authenticated or encrypted — synthetic or
+  de-identified data only. No patient-deletion endpoint exists; records persist
+  in the SQLite/Postgres database until removed by an administrator.
+- Check-ins stored before this release (patients created before 2026-10-21)
+  were scored by the retired LightGBM model and read ~1.00; use new patients.
+- Needle angle is a heuristic, not a depth measurement.
+
+## 9. Future work
+
+1. NIR capture device (850 nm illumination + IR-pass camera) registered via
+   `NIR_DEVICES`, and images from it for fine-tuning and evaluation.
+2. Ethics-approved collection of real IV-site photos with daily nurse VIP
+   scores, to calibrate redness thresholds and validate the scene check.
+3. 300–1,000 labelled real cannula photos to retrain and measure the detector.
+4. Re-annotation of a sample of "false-positive" vein regions.
+5. Authentication, audit review UI and encrypted storage before any real data.

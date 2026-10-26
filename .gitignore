@@ -52,3 +52,6 @@ backend/*.db
 # silently failed to match backend/data/uploads/ and five real patient images
 # were committed.
 uploads/
+
+# Demo set: regenerate with scripts/build_demo_set.py (sources are not redistributable)
+data/demo/

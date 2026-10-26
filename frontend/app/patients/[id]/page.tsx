@@ -1,9 +1,13 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import AlertBanner from "@/components/AlertBanner";
 import RiskChart from "@/components/RiskChart";
+import NirStatus from "@/components/NirStatus";
 import UploadCard from "@/components/UploadCard";
+import VeinResult from "@/components/VeinResult";
+import { hoursSince, isCheckDue } from "@/lib/timeline";
 import { getHistory, getPatient, postSiteCheck, postVeinScan } from "@/lib/api";
 import type { HistoryPoint, Patient, PatientHistory, SiteCheckin, VeinScan } from "@/lib/types";
 
@@ -16,6 +20,7 @@ export default function PatientPage({
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [scan, setScan] = useState<VeinScan | null>(null);
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [checkin, setCheckin] = useState<SiteCheckin | null>(null);
   const [history, setHistory] = useState<PatientHistory | null>(null);
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
@@ -36,9 +41,20 @@ export default function PatientPage({
     }
   }, [patientId]);
 
+  // Initial load: state is only set in the promise callbacks, never
+  // synchronously inside the effect.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let active = true;
+    Promise.all([getPatient(patientId), getHistory(patientId)])
+      .then(([p, h]) => {
+        if (!active) return;
+        setPatient(p);
+        setHistory(h);
+        setLoadedAt(Date.now());
+      })
+      .catch((e) => active && setLoadError(e instanceof Error ? e.message : "Failed to load patient"));
+    return () => { active = false; };
+  }, [patientId]);
 
   if (loadError) {
     return (
@@ -53,7 +69,8 @@ export default function PatientPage({
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <header>
-        <h1 className="text-2xl font-bold">{patient?.name ?? "Loading…"}</h1>
+        <Link href="/" className="text-xs text-teal-400 hover:underline">← Dashboard</Link>
+        <h1 className="mt-1 text-2xl font-bold">{patient?.name ?? "Loading…"}</h1>
         <p className="text-sm text-slate-500">
           MRN {patient?.mrn ?? "—"} · patient #{patientId}
         </p>
@@ -63,65 +80,19 @@ export default function PatientPage({
 
       {/* 1 — Pre-cannulation */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">1 · Pre-cannulation vein scan</h2>
+        <h2 className="text-lg font-semibold">1 · Pre-cannulation vein scan (NIR)</h2>
+        <NirStatus />
         <UploadCard
-          title="Capture forearm image"
-          description="NIR image of the antecubital fossa. Returns a suggested insertion point and needle angle."
-          buttonLabel="Upload vein scan"
-          onUpload={async (file) => setScan(await postVeinScan(patientId, file))}
+          title="Upload NIR forearm image"
+          description="Near-infrared image of the forearm from a registered NIR device, or a verified CUBITAL NIR frame. RGB photos are rejected before the model runs."
+          buttonLabel="Upload NIR scan"
+          onUpload={async (file) => {
+            const result = await postVeinScan(patientId, file);
+            setOriginalUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+            setScan(result);
+          }}
         />
-
-        {scan && (
-          <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-            {scan.insertion_x === null ? (
-              // A refusal is a valid clinical answer — show it plainly rather
-              // than rendering a marker at a coordinate the model did not give.
-              <div>
-                <p className="font-medium text-amber-700 dark:text-amber-400">
-                  No insertion site recommended
-                </p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  {scan.reason}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <span>
-                    Site <strong>({scan.insertion_x}, {scan.insertion_y})</strong>
-                  </span>
-                  <span>
-                    Angle <strong>{scan.angle_deg?.toFixed(1)}°</strong>
-                  </span>
-                  <span>
-                    Vein width <strong>{scan.vein_width_px?.toFixed(1)} px</strong>
-                  </span>
-                  {scan.vein_grade && (
-                    <span className="text-blue-700 dark:text-blue-400">
-                      Grade <strong>{scan.vein_grade}</strong>
-                    </span>
-                  )}
-                  <span className="text-slate-500" title={scan.reason ?? undefined}>
-                    Confidence <strong>{scan.confidence.toFixed(2)}</strong>
-                    {scan.reason && <span className="ml-1">· {scan.reason}</span>}
-                  </span>
-                </div>
-                {scan.overlay_png_base64 && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={`data:image/png;base64,${scan.overlay_png_base64}`}
-                    alt="Predicted vein mask with the selected insertion point marked"
-                    className="max-w-full rounded"
-                  />
-                )}
-                <p className="text-xs text-slate-500">
-                  Angle is a heuristic proxy for depth, not a measurement.
-                  Model {scan.model_version}. Advisory only — confirm before acting.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+        {scan && <VeinResult scan={scan} originalUrl={originalUrl} />}
       </section>
 
       {/* 2 — Post-cannulation */}
@@ -131,7 +102,8 @@ export default function PatientPage({
         <UploadCard
           title="Capture IV site"
           description="Daily photo of the cannula site. Hold the phone ~20 cm away, flash off, hub in the centre, with normal skin visible around the dressing. The first photo becomes this patient's baseline."
-          buttonLabel="Upload site check"
+          buttonLabel="Capture / upload site photo"
+          camera
           onUpload={async (file) => {
             setCheckin(await postSiteCheck(patientId, file));
             await refresh();
@@ -146,6 +118,7 @@ export default function PatientPage({
         <h2 className="text-lg font-semibold">3 · Redness over time</h2>
         <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
           <RiskChart points={history?.points ?? []} />
+          <AssessmentList points={history?.points ?? []} />
           {history && history.n_checkins > 0 && (
             <p className="mt-2 text-xs text-slate-500">
               {history.n_checkins} check-in{history.n_checkins === 1 ? "" : "s"} ·
@@ -167,10 +140,8 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 /** Reminder when the daily site photo is overdue. */
 function CheckDue({ points, now }: { points: HistoryPoint[]; now: number | null }) {
-  if (points.length === 0 || now === null) return null;
-  const last = new Date(points[points.length - 1].timestamp).getTime();
-  const hours = (now - last) / 36e5;
-  if (hours < 24) return null;
+  if (now === null || !isCheckDue(points.map((p) => p.timestamp), now)) return null;
+  const hours = hoursSince(points[points.length - 1].timestamp, now);
   return (
     <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
       Site check due — last photo {Math.floor(hours / 24)} day{hours >= 48 ? "s" : ""} ago.
@@ -190,6 +161,23 @@ function SiteCheckResult({ checkin }: { checkin: SiteCheckin }) {
 
   return (
     <div className="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded bg-slate-700 px-2 py-1 font-semibold text-white">Image accepted</span>
+        {checkin.assessment_label && (
+          <span className={`rounded px-2 py-1 font-semibold text-white ${STATUS_CLS[checkin.assessment_status ?? ""] ?? "bg-slate-600"}`}>
+            {checkin.assessment_label}
+          </span>
+        )}
+        {checkin.sample_origin === "simulated_demo" ? (
+          <span className="rounded border border-fuchsia-500 px-2 py-1 font-semibold text-fuchsia-300">
+            SIMULATED demo sample — not patient data
+          </span>
+        ) : (
+          <span className="rounded border border-slate-600 px-2 py-1">Uploaded photo</span>
+        )}
+        <span className="text-slate-500">assessed {new Date(checkin.created_at).toLocaleString()}</span>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <span className={`rounded px-2 py-1 text-sm font-semibold text-white ${levelCls}`}>
           {checkin.redness_label ?? "Measured"}
@@ -223,20 +211,25 @@ function SiteCheckResult({ checkin }: { checkin: SiteCheckin }) {
         </dl>
       )}
 
-      {checkin.overlay_png_base64 && (
-        <figure>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`data:image/png;base64,${checkin.overlay_png_base64}`}
-            alt="Site photo: green box is the detected hub, cyan outlines the measured ring, red marks skin counted as reddened"
-            className="max-h-[28rem] max-w-full rounded"
+      <div className={`grid gap-3 ${checkin.baseline_overlay_png_base64 ? "sm:grid-cols-2" : ""}`}>
+        {checkin.baseline_overlay_png_base64 && (
+          <SiteImage
+            b64={checkin.baseline_overlay_png_base64}
+            title={`Baseline${checkin.baseline_created_at ? ` · ${new Date(checkin.baseline_created_at).toLocaleString()}` : ""}`}
           />
-          <figcaption className="mt-1 text-xs text-slate-500">
-            Green: detected hub · cyan: measured ring · red: skin counted as reddened.
-            Dressing, tape and plastic are excluded.
-          </figcaption>
-        </figure>
-      )}
+        )}
+        {checkin.overlay_png_base64 && (
+          <SiteImage b64={checkin.overlay_png_base64} title={`This check-in · ${new Date(checkin.created_at).toLocaleString()}`} />
+        )}
+      </div>
+      <p className="text-xs text-slate-500">
+        Green: detected hub · cyan: measured ring · red: skin counted as reddened.
+        Dressing, tape and plastic are excluded.
+        {checkin.comparison_status === "compared" && checkin.scene_match_inliers !== null &&
+          ` Same site as baseline confirmed (${checkin.scene_match_inliers} matching landmarks).`}
+        {checkin.comparison_status === "baseline_unusable" &&
+          " The baseline photo has no verified cannula, so no comparison was made."}
+      </p>
 
       {checkin.clinical_explanation && checkin.clinical_explanation.length > 0 && (
         <div className="space-y-1 rounded border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
@@ -265,6 +258,49 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded border border-slate-200 p-2 dark:border-slate-700">
       <dt className="text-xs text-slate-500">{label}</dt>
       <dd className="mt-0.5 font-semibold">{value}</dd>
+    </div>
+  );
+}
+
+const STATUS_CLS: Record<string, string> = {
+  baseline_recorded: "bg-sky-700",
+  no_significant_change: "bg-emerald-700",
+  visible_change: "bg-amber-600",
+  review_recommended: "bg-red-700",
+  unable_to_compare: "bg-slate-600",
+};
+
+function SiteImage({ b64, title }: { b64: string; title: string }) {
+  return (
+    <figure>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`data:image/png;base64,${b64}`} alt={title} className="max-h-[24rem] w-full rounded object-contain" />
+      <figcaption className="mt-1 text-xs text-slate-500">{title}</figcaption>
+    </figure>
+  );
+}
+
+/** Previous assessments, newest first, in the viewer's local time. */
+function AssessmentList({ points }: { points: HistoryPoint[] }) {
+  if (points.length === 0) return null;
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full text-left text-xs">
+        <thead className="text-slate-500">
+          <tr><th className="py-1 pr-3">#</th><th className="pr-3">Time</th><th className="pr-3">Score</th><th className="pr-3">Change vs previous</th><th>Alert</th></tr>
+        </thead>
+        <tbody>
+          {points.map((p, i) => ({ p, i })).reverse().map(({ p, i }) => (
+            <tr key={i} className="border-t border-slate-800">
+              <td className="py-1 pr-3">{i + 1}{i === 0 && <span className="ml-1 text-sky-400">baseline</span>}</td>
+              <td className="pr-3">{new Date(p.timestamp).toLocaleString()}</td>
+              <td className="pr-3">{p.risk_score.toFixed(2)}</td>
+              <td className="pr-3">{i === 0 ? "—" : `${p.delta_from_previous >= 0 ? "+" : ""}${p.delta_from_previous.toFixed(2)}`}</td>
+              <td>{p.alert_triggered ? <span className="text-red-400">yes</span> : "no"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

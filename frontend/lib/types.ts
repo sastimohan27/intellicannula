@@ -23,6 +23,11 @@ export interface VeinScan {
   created_at: string;
   overlay_png_base64: string | null;
   vein_grade: string | null;
+  modality_status: string | null;
+  acquisition_source: string | null;
+  dataset_split: string | null;
+  mask_png_base64: string | null;
+  inference_ms: number | null;
 }
 
 export interface SiteCheckin {
@@ -40,6 +45,14 @@ export interface SiteCheckin {
   baseline_reddened_fraction: number | null;
   change_since_baseline: number | null;
   overlay_png_base64: string | null;
+  baseline_overlay_png_base64: string | null;
+  baseline_checkin_id: number | null;
+  baseline_created_at: string | null;
+  comparison_status: "baseline" | "compared" | "baseline_unusable" | null;
+  scene_match_inliers: number | null;
+  assessment_status: string | null;
+  assessment_label: string | null;
+  sample_origin: "uploaded_photo" | "simulated_demo" | null;
   vip_score: number | null;
   risk_velocity: string | null;
   clinical_explanation: string[] | null;
@@ -76,4 +89,19 @@ export interface AlertMessage {
   reason: string;
   trend: string;
   created_at: string;
+}
+
+export interface NirStatus {
+  registered_devices: string[];
+  dataset_frames: number;
+  live_capture_available: boolean;
+  phone_camera_is_nir: boolean;
+  accepted_sources: string[];
+  note: string;
+}
+
+export interface ModelInfo {
+  vein: { version: string; weights_present: boolean; mask_threshold: number; min_component_px: number };
+  infection_risk: { version: string; method: string; weights_present: boolean };
+  cannula_detector: { version: string; weights_present: boolean; conf_threshold: number };
 }

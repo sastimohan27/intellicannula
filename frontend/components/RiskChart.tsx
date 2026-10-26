@@ -36,7 +36,8 @@ export default function RiskChart({ points }: { points: HistoryPoint[] }) {
         <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} />
         <XAxis dataKey="index" tick={{ fontSize: 12 }}
                label={{ value: "check-in", position: "insideBottom", offset: -4, fontSize: 12 }} />
-        <YAxis domain={[0, 1]} tick={{ fontSize: 12 }} />
+        <YAxis domain={[0, 1]} tick={{ fontSize: 12 }}
+               label={{ value: "redness score (0-1)", angle: -90, position: "insideLeft", fontSize: 11 }} />
         <Tooltip
           formatter={(value) => (typeof value === "number" ? value.toFixed(3) : String(value ?? ""))}
           labelFormatter={(i) => data[Number(i) - 1]?.time ?? ""}
@@ -47,7 +48,7 @@ export default function RiskChart({ points }: { points: HistoryPoint[] }) {
                        label={{ value: "alert 0.6", fontSize: 11, fill: "#dc2626" }} />
         {/* Alert points are coloured via the line's own dots. A separate <Scatter>
             series would add its own rows (x index, unnamed value) to the tooltip. */}
-        <Line type="monotone" dataKey="risk" name="risk" stroke="#2563eb" strokeWidth={2}
+        <Line type="linear" dataKey="risk" name="redness score" stroke="#2563eb" strokeWidth={2}
               isAnimationActive={false}
               dot={({ cx, cy, payload, index }) => (
                 <circle key={index} cx={cx} cy={cy} r={payload.alert ? 4 : 3}

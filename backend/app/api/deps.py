@@ -9,6 +9,7 @@ from app.core.db import get_db
 from app.models import Patient
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_PIXELS = 40_000_000  # ~ a 48 MP phone photo; larger is refused, not decoded
 ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
 
 
@@ -43,4 +44,29 @@ async def read_image_upload(file: UploadFile) -> bytes:
             status_code=413,
             detail=f"image exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit",
         )
+    _ensure_decodable(data)
     return data
+
+
+def _ensure_decodable(data: bytes) -> None:
+    """Reject corrupt or oversized images before any model sees them.
+
+    The content-type header is client-supplied, so the bytes are checked too.
+    Dimensions are read from the header without decoding the pixels, which
+    stops a decompression bomb before it allocates memory.
+    """
+    import io
+
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            width, height = image.size
+            image.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="file is not a readable image (corrupt or unsupported)") from exc
+    if width * height > MAX_PIXELS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"image is {width}x{height}; the limit is {MAX_PIXELS // 1_000_000} megapixels",
+        )

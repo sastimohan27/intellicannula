@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createPatient, listPatients, API_URL } from "@/lib/api";
-import type { Patient } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { createPatient, getHistory, getModels, listPatients, API_URL } from "@/lib/api";
+import { isCheckDue } from "@/lib/timeline";
+import type { ModelInfo, Patient, PatientHistory } from "@/lib/types";
 
 export default function Home() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -14,6 +16,8 @@ export default function Home() {
   const [name, setName] = useState("");
   const [mrn, setMrn] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [models, setModels] = useState<ModelInfo | null>(null);
+  const router = useRouter();
 
   const fetchPatients = async () => {
     try {
@@ -29,15 +33,35 @@ export default function Home() {
   };
 
   useEffect(() => {
-    void fetchPatients();
+    listPatients()
+      .then((data) => { setPatients(data); setError(null); })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to connect to API"))
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    getModels().then(setModels).catch(() => setModels(null));
+  }, []);
+
+  // Demo patients get a DEMO- MRN so they are visibly separate from real records.
+  const handleCreateDemo = async () => {
+    try {
+      setSubmitting(true);
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+      const created = await createPatient("Demo Patient (synthetic)", `DEMO-${stamp}`);
+      router.push(`/patients/${created.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not create demo patient");
+      setSubmitting(false);
+    }
+  };
 
   const handleCreatePatient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !mrn.trim()) return;
     try {
       setSubmitting(true);
-      const newP = await createPatient(name.trim(), mrn.trim());
+      await createPatient(name.trim(), mrn.trim());
       setName("");
       setMrn("");
       await fetchPatients();
@@ -84,7 +108,7 @@ export default function Home() {
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-start space-x-3 text-amber-200">
           <div className="text-amber-400 text-lg">⚠️</div>
           <div className="text-sm">
-            <strong className="font-semibold text-amber-300">Clinical Protocol:</strong> IntelliCannula is advisory decision support. The system <em>recommends, never acts</em>—all insertion sites, angles, and infection risk metrics require clinician validation.
+            <strong className="font-semibold text-amber-300">Clinical Protocol:</strong> IntelliCannula is advisory decision support. The system <em>recommends, never acts</em>—all suggested insertion sites, angles and site-change measurements require clinician validation. Redness change alone cannot confirm or exclude infection. Use synthetic or de-identified data only: there is no authentication.
           </div>
         </div>
 
@@ -97,18 +121,19 @@ export default function Home() {
               </span>
               <h2 className="text-2xl font-bold text-white mb-2">Two-Phase Cannulation Management</h2>
               <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                Integrates NIR forearm segmentation (Attention U-Net) before insertion and longitudinal RGB tracking with YOLOv11 cannula hub detection and LightGBM risk monitoring post-insertion.
+                Before insertion: NIR forearm vein segmentation (Attention U-Net) — NIR images only. After insertion: daily RGB site photos, YOLOv11 cannula verification, and redness change measured against the patient&apos;s own baseline photo.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <Link
-                href="/patients/1"
-                className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-teal-500 text-slate-950 font-semibold text-sm hover:bg-teal-400 transition shadow-lg shadow-teal-500/20"
+              <button
+                onClick={() => void handleCreateDemo()}
+                disabled={submitting}
+                className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-teal-500 text-slate-950 font-semibold text-sm hover:bg-teal-400 transition shadow-lg shadow-teal-500/20 disabled:opacity-50"
               >
-                <span>Launch Patient 1 Monitor</span>
+                <span>Create demo patient</span>
                 <span>→</span>
-              </Link>
+              </button>
               <a
                 href="#enrolled-patients"
                 className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-800 text-slate-200 text-sm font-medium hover:bg-slate-700 transition border border-slate-700"
@@ -118,26 +143,13 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick System Stats */}
+          {/* Live model information (from the API) and measured results (from docs) */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Verified ML Pipeline</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Models &amp; measured results</h3>
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
-                <span className="text-slate-400">Vein Attention U-Net</span>
-                <span className="text-teal-300 font-mono text-xs">Dice 0.37 · 7.85M params</span>
-              </div>
-              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
-                <span className="text-slate-400">Cannula Hub YOLOv11</span>
-                <span className="text-teal-300 font-mono text-xs">mAP50 0.995 (Trained)</span>
-              </div>
-              <div className="flex justify-between items-center py-1.5 border-b border-slate-800">
-                <span className="text-slate-400">Infection LightGBM</span>
-                <span className="text-teal-300 font-mono text-xs">F1 0.988 (CV-Grouped)</span>
-              </div>
-              <div className="flex justify-between items-center py-1.5">
-                <span className="text-slate-400">Audit Logging</span>
-                <span className="text-emerald-400 font-mono text-xs">SHA-256 Verified</span>
-              </div>
+              <Row label="Vein U-Net (NIR only)" value={models ? `${models.vein.version} · test Dice 0.567` : "…"} />
+              <Row label="Cannula detector" value={models ? `${models.cannula_detector.version} · gate ≥ ${models.cannula_detector.conf_threshold}` : "…"} note="trained on synthetic images; real-world accuracy not measured" />
+              <Row label="Site monitoring" value={models ? models.infection_risk.version : "…"} note="redness measurement — not clinically validated" />
             </div>
           </div>
         </section>
@@ -147,7 +159,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-white">Patient Monitoring Directory</h2>
-              <p className="text-sm text-slate-400">Select a patient to review baseline scans, live risk curves, and automated alerts.</p>
+              <p className="text-sm text-slate-400">Select a patient to review vein scans, site photos against their baseline, redness trends and alerts.</p>
             </div>
             <button
               onClick={() => void fetchPatients()}
@@ -168,7 +180,7 @@ export default function Home() {
           ) : patients.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-slate-400">
               <p className="mb-2">No patients enrolled yet.</p>
-              <p className="text-xs text-slate-500">Create a patient below or launch Patient 1 directly.</p>
+              <p className="text-xs text-slate-500">Create a patient below, or a demo patient above.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -182,6 +194,7 @@ export default function Home() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-mono text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">
                         {p.mrn}
+                        {p.mrn.startsWith("DEMO-") && <span className="ml-2 text-fuchsia-300">demo</span>}
                       </span>
                       <span className="text-xs text-slate-500">#{p.id}</span>
                     </div>
@@ -190,6 +203,7 @@ export default function Home() {
                     </h3>
                   </div>
 
+                  <PatientSummary patientId={p.id} />
                   <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
                     <span>Enrolled: {new Date(p.created_at).toLocaleDateString()}</span>
                     <span className="text-teal-400 group-hover:translate-x-0.5 transition">Open Monitor →</span>
@@ -237,6 +251,46 @@ export default function Home() {
       <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600">
         IntelliCannula Research Prototype · Clinical Decision Support System · J-Component Evaluation
       </footer>
+    </div>
+  );
+}
+
+function Row({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="py-1.5 border-b border-slate-800 last:border-0">
+      <div className="flex justify-between items-center gap-3">
+        <span className="text-slate-400">{label}</span>
+        <span className="text-teal-300 font-mono text-xs text-right">{value}</span>
+      </div>
+      {note && <p className="text-[11px] text-amber-300/80 mt-0.5">{note}</p>}
+    </div>
+  );
+}
+
+/** Latest check-in, alert count and whether the daily photo is overdue. */
+function PatientSummary({ patientId }: { patientId: number }) {
+  const [history, setHistory] = useState<PatientHistory | null>(null);
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    getHistory(patientId).then((h) => { setHistory(h); setNow(Date.now()); }).catch(() => setHistory(null));
+  }, [patientId]);
+  if (!history || now === null) return null;
+  if (history.n_checkins === 0) {
+    return <p className="mt-3 text-xs text-slate-500">No site photos yet.</p>;
+  }
+  const last = history.points[history.points.length - 1];
+  const due = isCheckDue(history.points.map((p) => p.timestamp), now);
+  const alerts = history.points.filter((p) => p.alert_triggered).length;
+  return (
+    <div className="mt-3 space-y-1 text-xs">
+      <p className="text-slate-300">
+        {history.n_checkins} check-in{history.n_checkins === 1 ? "" : "s"} · latest score {last.risk_score.toFixed(2)} · trend {history.latest_trend}
+      </p>
+      <p className="text-slate-500">Last photo {new Date(last.timestamp).toLocaleString()}</p>
+      <div className="flex gap-2">
+        {alerts > 0 && <span className="rounded bg-red-900/60 px-1.5 py-0.5 text-red-300">{alerts} alert{alerts === 1 ? "" : "s"}</span>}
+        {due && <span className="rounded bg-amber-900/60 px-1.5 py-0.5 text-amber-300">site check due</span>}
+      </div>
     </div>
   );
 }

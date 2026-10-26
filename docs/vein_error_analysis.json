@@ -1,0 +1,66 @@
+{
+  "n": 288,
+  "dice_mean": 0.5672119225283387,
+  "dice_median": 0.6100149767170832,
+  "dice_p10": 0.3498263293016104,
+  "dice_p90": 0.741144683345436,
+  "share_dice_below_0.4": 0.17708333333333334,
+  "precision": 0.49547303205833465,
+  "recall": 0.7583186202432614,
+  "fp_share": {
+    "fp_near": 0.46834853460524845,
+    "fp_far_arm": 0.5284500598421111,
+    "fp_off_arm": 0.0032014055526404226
+  },
+  "recall_thin": 0.6986398544243284,
+  "recall_wide": 0.758710113879806,
+  "thin_share_of_vein_px": 0.22628249194789424,
+  "fragmentation_median": 1.5,
+  "dice_by_contrast": {
+    "low": [
+      0.5908514322582994,
+      96
+    ],
+    "mid": [
+      0.5745153882890884,
+      96
+    ],
+    "high": [
+      0.5362689470376283,
+      96
+    ]
+  },
+  "misaligned_masks": [],
+  "latency_ms_median": 60.886104503879324,
+  "device": "mps",
+  "examples": {
+    "worst": {
+      "frame": "743",
+      "dice": 0.01749271137026239
+    },
+    "low": {
+      "frame": "1672",
+      "dice": 0.3431952662721893
+    },
+    "median": {
+      "frame": "942",
+      "dice": 0.610738255033557
+    },
+    "best": {
+      "frame": "290",
+      "dice": 0.8378378378378378
+    }
+  },
+  "leakage": {
+    "identical_images_across_splits": {
+      "train/val": 0,
+      "train/test": 0,
+      "val/test": 0
+    },
+    "subjects_in_multiple_splits": {
+      "train/val": 0,
+      "train/test": 0,
+      "val/test": 0
+    }
+  }
+}

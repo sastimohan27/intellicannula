@@ -67,7 +67,7 @@ export default function AlertBanner({ patientId }: { patientId: number }) {
             {alert.reason}
           </p>
           <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-            Risk {alert.risk_score.toFixed(2)} · trend {alert.trend} · advisory
+            Redness score {alert.risk_score.toFixed(2)} · trend {alert.trend} · advisory
             only — confirm before acting
           </p>
         </div>
