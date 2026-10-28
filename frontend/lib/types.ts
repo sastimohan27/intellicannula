@@ -46,9 +46,11 @@ export interface SiteCheckin {
   change_since_baseline: number | null;
   overlay_png_base64: string | null;
   baseline_overlay_png_base64: string | null;
+  change_overlay_png_base64: string | null;
+  cannula_verification: "detected" | "baseline_position" | null;
   baseline_checkin_id: number | null;
   baseline_created_at: string | null;
-  comparison_status: "baseline" | "compared" | "baseline_unusable" | null;
+  comparison_status: "baseline" | "compared" | "no_colour_reference" | "baseline_unusable" | null;
   scene_match_inliers: number | null;
   assessment_status: string | null;
   assessment_label: string | null;

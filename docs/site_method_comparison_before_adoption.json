@@ -1,0 +1,202 @@
+{
+  "truth = realized redness in the image (primary)": {
+    "in_photo_reference": {
+      "n": 35,
+      "pearson_r": 0.5904962777300019,
+      "mae_points": 21.49886925177232,
+      "bias_points": -14.233245590762278,
+      "sensitivity": 0.8421052631578947,
+      "specificity": 0.6875,
+      "confusion": {
+        "tp": 16,
+        "fn": 3,
+        "tn": 11,
+        "fp": 5
+      },
+      "by_amount": {
+        "3.0": {
+          "true": 0.0,
+          "measured": 0.04187757693672428
+        },
+        "6.0": {
+          "true": 0.0011299193892499366,
+          "measured": 0.1181878600371203
+        },
+        "9.0": {
+          "true": 0.39502500478788966,
+          "measured": 0.1761331135267911
+        },
+        "12.0": {
+          "true": 0.5663183836760335,
+          "measured": 0.2487479795286894
+        },
+        "18.0": {
+          "true": 0.7159933219033616,
+          "measured": 0.28787974550988504
+        },
+        "24.0": {
+          "true": 0.7414197322063937,
+          "measured": 0.30078905906672954
+        }
+      },
+      "nuisance_false_visible_change": "1/21",
+      "nuisance_mean_abs_points": {
+        "JPEG quality 55": 1.1389008271751284,
+        "brighter exposure (x1.2)": 2.314897078508511,
+        "cool white balance": 2.2710145600720737,
+        "darker exposure (x0.75)": 4.479025856463221,
+        "phone moved (6 deg, shift)": 0.8770503106782762,
+        "warm white balance": 14.086750125823977
+      }
+    },
+    "baseline_anchored": {
+      "n": 35,
+      "pearson_r": 0.994432589395182,
+      "mae_points": 2.2792603806923153,
+      "bias_points": -2.2792603806923153,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "confusion": {
+        "tp": 19,
+        "fn": 0,
+        "tn": 16,
+        "fp": 0
+      },
+      "by_amount": {
+        "3.0": {
+          "true": 0.0,
+          "measured": 0.0
+        },
+        "6.0": {
+          "true": 0.0011299193892499366,
+          "measured": 0.0
+        },
+        "9.0": {
+          "true": 0.39502500478788966,
+          "measured": 0.32337396958239134
+        },
+        "12.0": {
+          "true": 0.5663183836760335,
+          "measured": 0.5231588964972266
+        },
+        "18.0": {
+          "true": 0.7159933219033616,
+          "measured": 0.7001804189716576
+        },
+        "24.0": {
+          "true": 0.7414197322063937,
+          "measured": 0.7292240548411727
+        }
+      },
+      "nuisance_false_visible_change": "0/21",
+      "nuisance_mean_abs_points": {
+        "JPEG quality 55": 0.2692468253906175,
+        "brighter exposure (x1.2)": 0.001571358533733925,
+        "cool white balance": 0.0,
+        "darker exposure (x0.75)": 0.0,
+        "phone moved (6 deg, shift)": 0.0054948306324127385,
+        "warm white balance": 0.0
+      }
+    }
+  },
+  "truth = injected redness (before RGB gamut clipping)": {
+    "in_photo_reference": {
+      "n": 35,
+      "pearson_r": 0.5900241815576295,
+      "mae_points": 21.59253152895936,
+      "bias_points": -14.27525441015504,
+      "sensitivity": 0.8421052631578947,
+      "specificity": 0.6875,
+      "confusion": {
+        "tp": 16,
+        "fn": 3,
+        "tn": 11,
+        "fp": 5
+      },
+      "by_amount": {
+        "3.0": {
+          "true": 0.0,
+          "measured": 0.04187757693672428
+        },
+        "6.0": {
+          "true": 0.0,
+          "measured": 0.1181878600371203
+        },
+        "9.0": {
+          "true": 0.3967413693852233,
+          "measured": 0.1761331135267911
+        },
+        "12.0": {
+          "true": 0.5676862518343472,
+          "measured": 0.2487479795286894
+        },
+        "18.0": {
+          "true": 0.716977507362858,
+          "measured": 0.28787974550988504
+        },
+        "24.0": {
+          "true": 0.7418531667162588,
+          "measured": 0.30078905906672954
+        }
+      },
+      "nuisance_false_visible_change": "1/21",
+      "nuisance_mean_abs_points": {
+        "JPEG quality 55": 1.1389008271751284,
+        "brighter exposure (x1.2)": 2.314897078508511,
+        "cool white balance": 2.2710145600720737,
+        "darker exposure (x0.75)": 4.479025856463221,
+        "phone moved (6 deg, shift)": 0.8770503106782762,
+        "warm white balance": 14.086750125823977
+      }
+    },
+    "baseline_anchored": {
+      "n": 35,
+      "pearson_r": 0.9942733175863153,
+      "mae_points": 2.3212692000850725,
+      "bias_points": -2.3212692000850725,
+      "sensitivity": 1.0,
+      "specificity": 1.0,
+      "confusion": {
+        "tp": 19,
+        "fn": 0,
+        "tn": 16,
+        "fp": 0
+      },
+      "by_amount": {
+        "3.0": {
+          "true": 0.0,
+          "measured": 0.0
+        },
+        "6.0": {
+          "true": 0.0,
+          "measured": 0.0
+        },
+        "9.0": {
+          "true": 0.3967413693852233,
+          "measured": 0.32337396958239134
+        },
+        "12.0": {
+          "true": 0.5676862518343472,
+          "measured": 0.5231588964972266
+        },
+        "18.0": {
+          "true": 0.716977507362858,
+          "measured": 0.7001804189716576
+        },
+        "24.0": {
+          "true": 0.7418531667162588,
+          "measured": 0.7292240548411727
+        }
+      },
+      "nuisance_false_visible_change": "0/21",
+      "nuisance_mean_abs_points": {
+        "JPEG quality 55": 0.2692468253906175,
+        "brighter exposure (x1.2)": 0.001571358533733925,
+        "cool white balance": 0.0,
+        "darker exposure (x0.75)": 0.0,
+        "phone moved (6 deg, shift)": 0.0054948306324127385,
+        "warm white balance": 0.0
+      }
+    }
+  }
+}

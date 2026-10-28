@@ -23,6 +23,9 @@ raw data: [`vein_postprocess_experiments.json`](vein_postprocess_experiments.jso
 | 10 | "+0.89 / day" trend | Per-check-in change labelled per day | "+0.89 since last check-in" |
 | 11 | Fake "VIP score" | Risk number relabelled | Removed; VIP needs signs a photo cannot show |
 | 12 | Dashboard claimed Dice 0.37, LightGBM F1 0.988, "mAP 0.995 (Trained)" | Stale hard-coded text | Live versions from `/models` + measured results with caveats |
+| 13 | Change since baseline under-measured (r 0.59 vs injected truth) | Each photo referenced to its own far skin, which spreading redness also reddens | Pixel-wise change vs aligned baseline, colour-matched on neutrals away from the site (r 0.995) |
+| 14 | Most-inflamed follow-ups refused (13/48) | Detector confidence drops on red skin | Weak detection accepted on follow-ups matching a verified baseline |
+| 15 | False "change" from white balance when nothing white is in frame | No colour reference | Reported as "unable to compare reliably"; capture guidance asks for a white sheet/paper |
 
 ## 2. Vein segmentation
 
@@ -106,6 +109,15 @@ images were also used as backgrounds for the synthetic training set.
 
 ## 5. Site-change monitoring
 
+**Controlled validation:** [`site_monitoring_validation.md`](site_monitoring_validation.md).
+On real limb photos with known injected redness, the adopted baseline-anchored
+change measurement agrees with the truth at r 0.995–0.996 (mean error 3.0–3.6
+points), detects every visible change, and raised 0 false alarms on 27
+lighting / white-balance / JPEG / phone-movement photos. It replaced the
+original measurement (r 0.59, mean error 21.5 points). Only 4 of 12 backgrounds
+were usable (detector misses), and comparisons with no white/grey reference in
+frame are deferred, not guessed.
+
 Pipeline: quality gate (resolution, blur, darkness, overexposure) → cannula gate
 → redness in a skin ring around the hub (`infection_module/src/erythema.py`) →
 comparison with the patient's baseline.
@@ -138,8 +150,9 @@ real phlebitis.
 
 | Suite | Command | Result |
 |---|---|---|
-| API | `cd backend && ../infection_module/.venv/bin/python -m pytest -q` | **66 passed** (39 original + 27 new) |
-| ML modules | `infection_module/.venv/bin/python -m pytest -q` | **188 passed** |
+| API | `cd backend && ../infection_module/.venv/bin/python -m pytest -q` | **68 passed** (39 original + 29 new) |
+| ML modules | `infection_module/.venv/bin/python -m pytest -q` | **192 passed** |
+| Site-change validation | `cd backend && ../infection_module/.venv/bin/python ../scripts/validate_site_monitoring.py` | r 0.995, 0 false alarms (§5) |
 | Frontend unit | `cd frontend && npm test` | **5 passed** |
 | Frontend static | `npx tsc --noEmit` · `npx eslint app components lib tests` | clean |
 | End-to-end demo | `infection_module/.venv/bin/python scripts/run_demo.py` | **6/6 steps** pass, 3 check-ins stored |

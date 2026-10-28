@@ -74,7 +74,7 @@ def main() -> None:
         "SIMULATED_day1_baseline.png": {"modality": "RGB (simulated)", "workflow": "site-check",
                                         "expected": "baseline recorded"},
         "SIMULATED_day2_mild.png": {"modality": "RGB (simulated)", "workflow": "site-check",
-                                    "expected": "mild redness"},
+                                    "expected": "visible change detected, no alert"},
         "SIMULATED_day3_spreading.png": {"modality": "RGB (simulated)", "workflow": "site-check",
                                          "expected": "review recommended (alert)"},
         "3_site_check_landscape_REJECTED.png": {"modality": "RGB", "workflow": "site-check",

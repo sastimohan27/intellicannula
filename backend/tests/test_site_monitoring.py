@@ -71,6 +71,36 @@ class TestRealPipeline:
         assert ml.sample_origin(_png(np.zeros((8, 8, 3), np.uint8))) == "uploaded_photo"
 
 
+@needs_pipeline
+class TestWeakDetectionOnFollowUp:
+    """Redder skin lowered detector confidence on 13/48 validation follow-ups;
+    a verified baseline + confirmed scene match lets those be assessed."""
+
+    def test_weak_follow_up_uses_verified_baseline_position(self, monkeypatch):
+        base = _read("SIMULATED_day1_baseline.png")
+        ml._baseline_cache.clear()
+        ml.run_site_check(base, 0, None)            # baseline verified for real
+        ml._baseline_measurement(base)               # cached with its hub
+
+        def weak(_image):
+            raise ml.CannulaUnverified("Unable to verify the cannula", confidence=0.35)
+
+        monkeypatch.setattr(ml, "_locate_roi", weak)
+        result = ml.run_site_check(_read("SIMULATED_day3_spreading.png"), 0, base)
+        assert result["cannula_verification"] == "baseline_position"
+        assert result["cannula_confidence"] == 0.35
+        assert result["change_since_baseline"] > 0.3
+        assert result["change_overlay_png_base64"]
+
+    def test_weak_detection_without_baseline_is_rejected(self, monkeypatch):
+        def weak(_image):
+            raise ml.CannulaUnverified("Unable to verify the cannula", confidence=0.35)
+
+        monkeypatch.setattr(ml, "_locate_roi", weak)
+        with pytest.raises(ml.CannulaUnverified):
+            ml.run_site_check(_read("SIMULATED_day3_spreading.png"), 0, None)
+
+
 class TestCannulaStates:
     def _patch(self, monkeypatch, confidence):
         from infection_module.src.cannula_detector import inference

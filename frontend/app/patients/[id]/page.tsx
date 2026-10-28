@@ -101,7 +101,7 @@ export default function PatientPage({
         <CheckDue points={history?.points ?? []} now={loadedAt} />
         <UploadCard
           title="Capture IV site"
-          description="Daily photo of the cannula site. Hold the phone ~20 cm away, flash off, hub in the centre, with normal skin visible around the dressing. The first photo becomes this patient's baseline."
+          description="Daily photo of the cannula site. Hold the phone ~20 cm away, flash off, hub in the centre, with normal skin visible around the dressing and a white sheet or piece of white paper in the frame (used to correct colour between days). The first photo becomes this patient's baseline."
           buttonLabel="Capture / upload site photo"
           camera
           onUpload={async (file) => {
@@ -187,7 +187,9 @@ function SiteCheckResult({ checkin }: { checkin: SiteCheckin }) {
         </span>
         {checkin.cannula_confidence !== null && (
           <span className="text-sm text-slate-500">
-            Cannula detected · {checkin.cannula_confidence.toFixed(2)}
+            {checkin.cannula_verification === "baseline_position"
+              ? `Cannula weakly detected (${checkin.cannula_confidence.toFixed(2)}) · position from verified baseline`
+              : `Cannula detected · ${checkin.cannula_confidence.toFixed(2)}`}
           </span>
         )}
       </div>
@@ -211,7 +213,7 @@ function SiteCheckResult({ checkin }: { checkin: SiteCheckin }) {
         </dl>
       )}
 
-      <div className={`grid gap-3 ${checkin.baseline_overlay_png_base64 ? "sm:grid-cols-2" : ""}`}>
+      <div className={`grid gap-3 ${checkin.change_overlay_png_base64 ? "sm:grid-cols-3" : checkin.baseline_overlay_png_base64 ? "sm:grid-cols-2" : ""}`}>
         {checkin.baseline_overlay_png_base64 && (
           <SiteImage
             b64={checkin.baseline_overlay_png_base64}
@@ -220,6 +222,9 @@ function SiteCheckResult({ checkin }: { checkin: SiteCheckin }) {
         )}
         {checkin.overlay_png_base64 && (
           <SiteImage b64={checkin.overlay_png_base64} title={`This check-in · ${new Date(checkin.created_at).toLocaleString()}`} />
+        )}
+        {checkin.change_overlay_png_base64 && (
+          <SiteImage b64={checkin.change_overlay_png_base64} title="Change since baseline (magenta = redder than baseline)" />
         )}
       </div>
       <p className="text-xs text-slate-500">

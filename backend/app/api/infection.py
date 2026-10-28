@@ -113,6 +113,8 @@ async def create_site_check(
         response.skin_visible_fraction = redness["skin_fraction"]
     response.baseline_reddened_fraction = result.get("baseline_reddened_fraction")
     response.baseline_overlay_png_base64 = result.get("baseline_overlay_png_base64")
+    response.change_overlay_png_base64 = result.get("change_overlay_png_base64")
+    response.cannula_verification = result.get("cannula_verification")
     response.comparison_status = result.get("comparison_status")
     response.scene_match_inliers = result.get("scene_match_inliers")
     response.sample_origin = result.get("sample_origin")
@@ -129,8 +131,14 @@ async def create_site_check(
     response.risk_velocity = _format_risk_velocity(delta)
     response.clinical_explanation = _explain(
         redness, result.get("change_since_baseline"), is_baseline=not previous,
-        trend=checkin.trend,
+        trend=checkin.trend, comparison=result.get("comparison_status"),
     )
+    if result.get("cannula_verification") == "baseline_position":
+        response.clinical_explanation.append(
+            f"The cannula was only weakly detected in this photo (confidence "
+            f"{result['cannula_confidence']:.2f}); its position was taken from the "
+            "verified baseline photo, which this photo was confirmed to match."
+        )
     return response
 
 
@@ -202,13 +210,16 @@ def _assessment(
         return "baseline_recorded", "Baseline recorded"
     if comparison == "baseline_unusable" or change is None:
         return "unable_to_compare", "Image accepted - unable to compare with baseline"
+    if comparison == "no_colour_reference":
+        return "unable_to_compare", "Unable to compare reliably - no white/grey reference in frame"
     if change >= VISIBLE_CHANGE or (redness and redness["redness_level"] >= 2):
         return "visible_change", "Visible change detected"
     return "no_significant_change", "No significant visible change"
 
 
 def _explain(
-    redness: dict | None, change: float | None, is_baseline: bool, trend: str | None
+    redness: dict | None, change: float | None, is_baseline: bool, trend: str | None,
+    comparison: str | None = None,
 ) -> list[str]:
     """Plain statements of what was measured - every number traceable to the photo."""
     if redness is None:
@@ -232,7 +243,17 @@ def _explain(
         lines.append("The baseline photo has no verified cannula, so change since "
                      "insertion cannot be computed. Start a new baseline for this site.")
     else:
-        lines.append(f"Change since baseline: {change * 100:+.0f} percentage points of reddened skin.")
+        lines.append(
+            f"{change:.0%} of the skin around the site is redder than in the baseline photo "
+            "(pixel-by-pixel, after aligning the photos and matching their colours on "
+            "white/grey objects such as sheets and tape)."
+        )
+    if comparison == "no_colour_reference":
+        lines.append(
+            "No white or grey object (sheet, tape, paper) is visible away from the site, so a "
+            "lighting change cannot be told apart from redness. Include a white sheet or a "
+            "piece of white paper in the next photo."
+        )
     if trend == "worsening":
         lines.append("Redness is rising across recent check-ins.")
     lines.append(

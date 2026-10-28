@@ -248,11 +248,12 @@ on it is reported as proxy-label performance, and the caveat is written into
 | Vein segmentation | Precision / recall (test) | 0.495 / 0.758 (was 0.262 / 0.814) |
 | Cannula gate | False acceptance on real no-cannula images (n=400) | 1–2% |
 | Vein scan | RGB / unverified images reaching the model | 0 (provenance gate) |
-| Site redness | Functional tests (monotonic, tape/plastic excluded) | pass — **not clinical validation** |
+| Site change | Agreement with known injected redness, real limb photos (r / mean error) | 0.995 / 3.6 pts — **simulated, not clinical validation** ([report](docs/site_monitoring_validation.md)) |
+| Site change | False alarms from lighting, white balance, JPEG, phone movement | 0 / 27 |
 | Infection risk (retired from API) | F1 (5-fold, grouped) | 0.9885 — **proxy labels** |
 | Latency (warm, MPS) | vein-scan / site-check request | 185 ms / 127–182 ms |
 | ONNX parity (epoch-16 export) | max abs difference | 3.1e-06 |
-| Tests | module + API + frontend | 188 + 66 + 5 |
+| Tests | module + API + frontend | 192 + 68 + 5 |
 
 Read [`docs/full_system_eval.md`](docs/full_system_eval.md) before quoting any
 of these. The infection F1 is a proxy-label number that an ablation shows is

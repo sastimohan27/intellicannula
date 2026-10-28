@@ -1,0 +1,169 @@
+{
+  "as photographed": {
+    "deferred_no_colour_reference": 24,
+    "nuisance_deferred_no_colour_reference": 12,
+    "n": 24,
+    "pearson_r": 0.995004273371214,
+    "mae_points": 3.5514389970750524,
+    "bias_points": -3.5514389970750524,
+    "sensitivity": 1.0,
+    "specificity": 1.0,
+    "confusion": {
+      "tp": 16,
+      "fn": 0,
+      "tn": 8,
+      "fp": 0
+    },
+    "by_amount": {
+      "3.0": {
+        "true": 0.0,
+        "measured": 0.0
+      },
+      "6.0": {
+        "true": 0.0011075078314228624,
+        "measured": 0.0
+      },
+      "9.0": {
+        "true": 0.3402759517235488,
+        "measured": 0.26539787218176825
+      },
+      "12.0": {
+        "true": 0.49866767658636624,
+        "measured": 0.4389008115278482
+      },
+      "18.0": {
+        "true": 0.6689468877576524,
+        "measured": 0.6321494209996744
+      },
+      "24.0": {
+        "true": 0.753379474014053,
+        "measured": 0.7128430533792494
+      }
+    },
+    "nuisance_false_visible_change": "0/11",
+    "nuisance_mean_abs_points": {
+      "JPEG quality 55": 0.25381345208926104,
+      "brighter exposure (x1.2)": 0.0,
+      "cool white balance": 0.0,
+      "darker exposure (x0.75)": 0.0,
+      "phone moved (6 deg, shift)": 0.015078407720144751,
+      "warm white balance": 0.0
+    }
+  },
+  "white card added where the scene had no white/grey reference": {
+    "deferred_no_colour_reference": 12,
+    "nuisance_deferred_no_colour_reference": 7,
+    "n": 36,
+    "pearson_r": 0.9960734076820292,
+    "mae_points": 2.9856238498283236,
+    "bias_points": -2.9856238498283236,
+    "sensitivity": 1.0,
+    "specificity": 1.0,
+    "confusion": {
+      "tp": 24,
+      "fn": 0,
+      "tn": 12,
+      "fp": 0
+    },
+    "by_amount": {
+      "3.0": {
+        "true": 0.0,
+        "measured": 0.0
+      },
+      "6.0": {
+        "true": 0.0011887946672856334,
+        "measured": 0.0
+      },
+      "9.0": {
+        "true": 0.3804205515565382,
+        "measured": 0.3158274383016546
+      },
+      "12.0": {
+        "true": 0.5377420625842256,
+        "measured": 0.48881503355356487
+      },
+      "18.0": {
+        "true": 0.6980188812282031,
+        "measured": 0.668475650572629
+      },
+      "24.0": {
+        "true": 0.7801445966498125,
+        "measured": 0.7452593332685171
+      }
+    },
+    "nuisance_false_visible_change": "0/16",
+    "nuisance_mean_abs_points": {
+      "JPEG quality 55": 0.25552893017929096,
+      "brighter exposure (x1.2)": 0.0,
+      "cool white balance": 0.0,
+      "darker exposure (x0.75)": 0.0,
+      "phone moved (6 deg, shift)": 0.010052271813429835,
+      "warm white balance": 0.0
+    }
+  },
+  "as photographed, truth = injected": {
+    "deferred_no_colour_reference": 24,
+    "nuisance_deferred_no_colour_reference": 12,
+    "n": 24,
+    "pearson_r": 0.994728761284764,
+    "mae_points": 3.6264364990870814,
+    "bias_points": -3.6264364990870814,
+    "sensitivity": 1.0,
+    "specificity": 1.0,
+    "confusion": {
+      "tp": 16,
+      "fn": 0,
+      "tn": 8,
+      "fp": 0
+    },
+    "by_amount": {
+      "3.0": {
+        "true": 0.0,
+        "measured": 0.0
+      },
+      "6.0": {
+        "true": 0.0,
+        "measured": 0.0
+      },
+      "9.0": {
+        "true": 0.34241577436831827,
+        "measured": 0.26539787218176825
+      },
+      "12.0": {
+        "true": 0.5004398271752986,
+        "measured": 0.4389008115278482
+      },
+      "18.0": {
+        "true": 0.6698874907768843,
+        "measured": 0.6321494209996744
+      },
+      "24.0": {
+        "true": 0.754134255713264,
+        "measured": 0.7128430533792494
+      }
+    },
+    "nuisance_false_visible_change": "0/11",
+    "nuisance_mean_abs_points": {
+      "JPEG quality 55": 0.25381345208926104,
+      "brighter exposure (x1.2)": 0.0,
+      "cool white balance": 0.0,
+      "darker exposure (x0.75)": 0.0,
+      "phone moved (6 deg, shift)": 0.015078407720144751,
+      "warm white balance": 0.0
+    }
+  },
+  "refused_follow_ups": [],
+  "refused_nuisance": [
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "nuisance": "cool white balance",
+      "measured_change": null,
+      "status": "refused: Only 12% of the area around the cannula is visible skin (nee"
+    }
+  ],
+  "cannula_verification": {
+    "detected": 55,
+    "baseline_position": 17
+  }
+}

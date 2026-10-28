@@ -1,0 +1,1170 @@
+{
+  "summary": {
+    "backgrounds_used": 4,
+    "backgrounds_skipped": [
+      [
+        "ac619862d2ffa641.png",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ],
+      [
+        "extravasation-wound-a-003.jpg",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ],
+      [
+        "extravasation-wound-a-005.jpg",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ],
+      [
+        "extravasation-wound-a-006.jpg",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ],
+      [
+        "extravasation-wound-b-004.jpg",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ],
+      [
+        "leg-ulcers-0002.jpg",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ],
+      [
+        "leg-ulcers-0009.jpg",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ],
+      [
+        "leg-ulcers-0011.jpg",
+        "No cannula detected in this photo. The cannula site is not clearly visible - retake it wit"
+      ]
+    ],
+    "follow_ups": 72,
+    "follow_ups_refused": 0,
+    "pearson_r": 0.9974730804501719,
+    "mae_points": 2.4184920117639375,
+    "bias_points": -2.4184920117639375,
+    "visible_change_agreement": {
+      "tp": 48,
+      "fn": 0,
+      "tn": 24,
+      "fp": 0,
+      "sensitivity": 1.0,
+      "specificity": 1.0
+    },
+    "by_amount": {
+      "3.0": {
+        "n": 12,
+        "true_mean": 0.0,
+        "measured_mean": 0.0,
+        "mae": 0.0
+      },
+      "6.0": {
+        "n": 12,
+        "true_mean": 0.0011393120378785492,
+        "measured_mean": 0.0,
+        "mae": 0.0011393120378785492
+      },
+      "9.0": {
+        "n": 12,
+        "true_mean": 0.4090388031742686,
+        "measured_mean": 0.3537572212183681,
+        "mae": 0.05528158195590047
+      },
+      "12.0": {
+        "n": 12,
+        "true_mean": 0.5780933960132247,
+        "measured_mean": 0.5366494179865232,
+        "mae": 0.04144397802670138
+      },
+      "18.0": {
+        "n": 12,
+        "true_mean": 0.7373437070352807,
+        "measured_mean": 0.7131686681915507,
+        "mae": 0.024175038843730044
+      },
+      "24.0": {
+        "n": 12,
+        "true_mean": 0.8086895755073407,
+        "measured_mean": 0.7856199656657149,
+        "mae": 0.023069609841625777
+      }
+    },
+    "nuisance": {
+      "n": 36,
+      "refused": 1,
+      "false_visible_change": 2,
+      "max_abs_change_points": 13.336599412105821,
+      "by_type": {
+        "JPEG quality 55": {
+          "mean_abs_change_points": 0.23228642923657336,
+          "refused": 0
+        },
+        "brighter exposure (x1.2)": {
+          "mean_abs_change_points": 0.08942372637099223,
+          "refused": 0
+        },
+        "cool white balance": {
+          "mean_abs_change_points": 0.0,
+          "refused": 1
+        },
+        "darker exposure (x0.75)": {
+          "mean_abs_change_points": 0.0,
+          "refused": 0
+        },
+        "phone moved (6 deg, shift)": {
+          "mean_abs_change_points": 0.0077735512229212865,
+          "refused": 0
+        },
+        "warm white balance": {
+          "mean_abs_change_points": 4.418963931732735,
+          "refused": 0
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 6.0,
+      "true_change": 0.0003394134432865278,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 9.0,
+      "true_change": 0.332549749211178,
+      "injected_change": 0.3351519189430414,
+      "measured_change": 0.2798778111604168,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 12.0,
+      "true_change": 0.48625375554689565,
+      "injected_change": 0.48703314937962766,
+      "measured_change": 0.45783102238871637,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 18.0,
+      "true_change": 0.6175690454939723,
+      "injected_change": 0.6176821833084011,
+      "measured_change": 0.5998944047065331,
+      "status": "no_colour_reference",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 24.0,
+      "true_change": 0.683176406994431,
+      "injected_change": 0.6839306590906233,
+      "measured_change": 0.6670228412676463,
+      "status": "no_colour_reference",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 6.0,
+      "true_change": 0.0023633232347358233,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 9.0,
+      "true_change": 0.5888697532338558,
+      "injected_change": 0.5903908282945103,
+      "measured_change": 0.5370400633571761,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 12.0,
+      "true_change": 0.7455279136129932,
+      "injected_change": 0.7474386855900137,
+      "measured_change": 0.7118882701228174,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 18.0,
+      "true_change": 0.8947566908446366,
+      "injected_change": 0.8947315491080969,
+      "measured_change": 0.8814315704785729,
+      "status": "no_colour_reference",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 24.0,
+      "true_change": 0.9841732768482319,
+      "injected_change": 0.9845755446328678,
+      "measured_change": 0.9736766018428893,
+      "status": "no_colour_reference",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 6.0,
+      "true_change": 0.0002074524835025882,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 9.0,
+      "true_change": 0.27203935669972734,
+      "injected_change": 0.2734816453945549,
+      "measured_change": 0.23138854862291067,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 12.0,
+      "true_change": 0.4637649662148813,
+      "injected_change": 0.4646244122179634,
+      "measured_change": 0.4312443197534279,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 18.0,
+      "true_change": 0.6054154976883867,
+      "injected_change": 0.605701979689414,
+      "measured_change": 0.5893033548030189,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 24.0,
+      "true_change": 0.6808096574070416,
+      "injected_change": 0.6810171098905441,
+      "measured_change": 0.666248468803098,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 6.0,
+      "true_change": 0.0016991346267831034,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 9.0,
+      "true_change": 0.5750977990279369,
+      "injected_change": 0.5764709368949302,
+      "measured_change": 0.5305844232820959,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 12.0,
+      "true_change": 0.768226182479156,
+      "injected_change": 0.7706760975224246,
+      "measured_change": 0.7303908009641601,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 18.0,
+      "true_change": 0.9597048247520449,
+      "injected_change": 0.961947287311811,
+      "measured_change": 0.9341684119018453,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 24.0,
+      "true_change": 0.992600861421741,
+      "injected_change": 0.993341763148536,
+      "measured_change": 0.985745050776465,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 6.0,
+      "true_change": 0.0003188540874641289,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 9.0,
+      "true_change": 0.28157268646832306,
+      "injected_change": 0.28289715729317405,
+      "measured_change": 0.1791714699173432,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 12.0,
+      "true_change": 0.38968874935616,
+      "injected_change": 0.3901057123936131,
+      "measured_change": 0.3229991906011626,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 18.0,
+      "true_change": 0.5179662014667288,
+      "injected_change": 0.5186774913541488,
+      "measured_change": 0.47261533933433075,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 24.0,
+      "true_change": 0.5947364548330921,
+      "injected_change": 0.5958401805204679,
+      "measured_change": 0.5481347035883348,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 6.0,
+      "true_change": 0.0022074513747516616,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 9.0,
+      "true_change": 0.477937749871232,
+      "injected_change": 0.48181305339579605,
+      "measured_change": 0.3480169728483481,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 12.0,
+      "true_change": 0.67084447278703,
+      "injected_change": 0.6753084300115278,
+      "measured_change": 0.564249098624022,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 18.0,
+      "true_change": 0.8589683843908661,
+      "injected_change": 0.8606117093031812,
+      "measured_change": 0.7958598023104658,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 24.0,
+      "true_change": 0.9475852934683967,
+      "injected_change": 0.948124892693336,
+      "measured_change": 0.8969120207990974,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 6.0,
+      "true_change": 0.00019197235598073878,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 9.0,
+      "true_change": 0.17389495912588587,
+      "injected_change": 0.17579868498936152,
+      "measured_change": 0.14045977379257388,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 12.0,
+      "true_change": 0.32585707658097235,
+      "injected_change": 0.3270729015021837,
+      "measured_change": 0.2993808891519621,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 18.0,
+      "true_change": 0.4805548001087843,
+      "injected_change": 0.4810987217840631,
+      "measured_change": 0.46625285958821927,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.0,
+      "amount": 24.0,
+      "true_change": 0.5508486777903981,
+      "injected_change": 0.5512006271096962,
+      "measured_change": 0.5336831496264538,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 6.0,
+      "true_change": 0.0017117535074949208,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 9.0,
+      "true_change": 0.42769841142875425,
+      "injected_change": 0.4291542017949415,
+      "measured_change": 0.3939432721688077,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 12.0,
+      "true_change": 0.6082804076213025,
+      "injected_change": 0.6092722647938696,
+      "measured_change": 0.5689740677342463,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 18.0,
+      "true_change": 0.8182981650642307,
+      "injected_change": 0.8191620406661441,
+      "measured_change": 0.7938696827656817,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "spread": 1.6,
+      "amount": 24.0,
+      "true_change": 0.9203474699643251,
+      "injected_change": 0.9213713225295558,
+      "measured_change": 0.8726423395031115,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 6.0,
+      "true_change": 0.0003394134432865278,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 9.0,
+      "true_change": 0.332549749211178,
+      "injected_change": 0.3351519189430414,
+      "measured_change": 0.29222240380143055,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 12.0,
+      "true_change": 0.48625375554689565,
+      "injected_change": 0.48703314937962766,
+      "measured_change": 0.46127544029466117,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 18.0,
+      "true_change": 0.6175690454939723,
+      "injected_change": 0.6176821833084011,
+      "measured_change": 0.600384668569058,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 24.0,
+      "true_change": 0.683176406994431,
+      "injected_change": 0.6839306590906233,
+      "measured_change": 0.6478648380243623,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 6.0,
+      "true_change": 0.0023633232347358233,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 9.0,
+      "true_change": 0.5888697532338558,
+      "injected_change": 0.5903908282945103,
+      "measured_change": 0.541150737281424,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 12.0,
+      "true_change": 0.7455279136129932,
+      "injected_change": 0.7474386855900137,
+      "measured_change": 0.7160115149153352,
+      "status": "compared",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 18.0,
+      "true_change": 0.8947566908446366,
+      "injected_change": 0.8947315491080969,
+      "measured_change": 0.8818715508680185,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 24.0,
+      "true_change": 0.9841732768482319,
+      "injected_change": 0.9845755446328678,
+      "measured_change": 0.9723189480697432,
+      "status": "compared",
+      "verification": "baseline_position"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 6.0,
+      "true_change": 0.0002099622068027755,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 9.0,
+      "true_change": 0.27533044052070627,
+      "injected_change": 0.27679017776800174,
+      "measured_change": 0.23423783718930594,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 12.0,
+      "true_change": 0.4693755124077666,
+      "injected_change": 0.4702453558359495,
+      "measured_change": 0.436391449539083,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 18.0,
+      "true_change": 0.6127397068527665,
+      "injected_change": 0.6130296546621609,
+      "measured_change": 0.5964326421244176,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.0,
+      "amount": 24.0,
+      "true_change": 0.6890459717250895,
+      "injected_change": 0.6892559339318922,
+      "measured_change": 0.6743086244475994,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 3.0,
+      "true_change": 0.0,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 6.0,
+      "true_change": 0.0017196904557179708,
+      "injected_change": 0.0,
+      "measured_change": 0.0,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 9.0,
+      "true_change": 0.5820552300585895,
+      "injected_change": 0.5834449799036173,
+      "measured_change": 0.5369933411985842,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 12.0,
+      "true_change": 0.7775200463916495,
+      "injected_change": 0.779999600071987,
+      "measured_change": 0.7391569517486852,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 18.0,
+      "true_change": 0.969825431422344,
+      "injected_change": 0.9719650462916675,
+      "measured_change": 0.9459397308484473,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "spread": 1.6,
+      "amount": 24.0,
+      "true_change": 0.9936011517926773,
+      "injected_change": 0.9942110420124377,
+      "measured_change": 0.9888820012397769,
+      "status": "no_colour_reference",
+      "verification": "detected"
+    }
+  ],
+  "nuisance_rows": [
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "nuisance": "darker exposure (x0.75)",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "nuisance": "brighter exposure (x1.2)",
+      "measured_change": 6.2854341349357e-05,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "nuisance": "warm white balance",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "nuisance": "cool white balance",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "nuisance": "JPEG quality 55",
+      "measured_change": 0.0025644571270537655,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": false,
+      "nuisance": "phone moved (6 deg, shift)",
+      "measured_change": 0.00016484491897238214,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "nuisance": "darker exposure (x0.75)",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "nuisance": "brighter exposure (x1.2)",
+      "measured_change": 0.00263761014739005,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "nuisance": "warm white balance",
+      "measured_change": 0.1317718417829059,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "nuisance": "cool white balance",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "nuisance": "JPEG quality 55",
+      "measured_change": 0.0018571936618326946,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": false,
+      "nuisance": "phone moved (6 deg, shift)",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "nuisance": "darker exposure (x0.75)",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "nuisance": "brighter exposure (x1.2)",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "nuisance": "warm white balance",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "nuisance": "cool white balance",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "nuisance": "JPEG quality 55",
+      "measured_change": 0.003188540874641289,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burn-to-arm-1.jpg",
+      "card": false,
+      "nuisance": "phone moved (6 deg, shift)",
+      "measured_change": 0.00030156815440289503,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "nuisance": "darker exposure (x0.75)",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "nuisance": "brighter exposure (x1.2)",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "nuisance": "warm white balance",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "nuisance": "cool white balance",
+      "measured_change": null,
+      "status": "refused: Only 12% of the area around the cannula is visible skin (nee"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "nuisance": "JPEG quality 55",
+      "measured_change": 0.0018877281671439313,
+      "status": "compared"
+    },
+    {
+      "background": "case2-burns-to-arm-7.jpg",
+      "card": false,
+      "nuisance": "phone moved (6 deg, shift)",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "nuisance": "darker exposure (x0.75)",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "nuisance": "brighter exposure (x1.2)",
+      "measured_change": 7.54252096192284e-05,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "nuisance": "warm white balance",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "nuisance": "cool white balance",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "nuisance": "JPEG quality 55",
+      "measured_change": 0.0025895988635935086,
+      "status": "compared"
+    },
+    {
+      "background": "extravasation-wound-a-007.jpg",
+      "card": true,
+      "nuisance": "phone moved (6 deg, shift)",
+      "measured_change": 0.0,
+      "status": "compared"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "nuisance": "darker exposure (x0.75)",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "nuisance": "brighter exposure (x1.2)",
+      "measured_change": 0.002589533883900898,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "nuisance": "warm white balance",
+      "measured_change": 0.1333659941210582,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "nuisance": "cool white balance",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "nuisance": "JPEG quality 55",
+      "measured_change": 0.0018496670599292128,
+      "status": "no_colour_reference"
+    },
+    {
+      "background": "extravasation-wound-b-003.jpg",
+      "card": true,
+      "nuisance": "phone moved (6 deg, shift)",
+      "measured_change": 0.0,
+      "status": "no_colour_reference"
+    }
+  ]
+}

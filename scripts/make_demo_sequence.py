@@ -54,10 +54,16 @@ def composite_hub(bg: np.ndarray, centre: tuple[int, int], width_frac: float) ->
     return cv2.cvtColor(np.array(canvas), cv2.COLOR_RGB2BGR), box
 
 
-def redden(img: np.ndarray, centre: tuple[int, int], amount: float, sigma: float) -> np.ndarray:
+def redden(img: np.ndarray, centre: tuple[int, int], amount: float, sigma: float,
+           skin_only: bool = True) -> np.ndarray:
+    """Add a* redness spreading from the hub. Erythema is in skin, so by default
+    tape, dressing, plastic and sheets are left unchanged."""
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB).astype(np.float32)
     yy, xx = np.mgrid[: img.shape[0], : img.shape[1]]
     g = np.exp(-((xx - centre[0]) ** 2 + (yy - centre[1]) ** 2) / (2 * sigma**2))
+    if skin_only:
+        from infection_module.src.erythema import skin_mask
+        g *= cv2.GaussianBlur(skin_mask(img).astype(np.float32), (7, 7), 0)
     lab[..., 1] += amount * g
     return cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
 
@@ -81,7 +87,7 @@ def main() -> None:
     day1, box = composite_hub(bg, centre, args.width_frac)
     sigma = 1.6 * (box[2] - box[0])
     for day, amount, tag in DAYS:
-        img = day1 if amount == 0 else redden(day1, centre, amount, sigma)
+        img = day1 if amount == 0 else redden(day1, centre, amount, sigma, skin_only=True)
         path = out / f"SIMULATED_day{day}_{tag}.png"
         meta = PngInfo()
         meta.add_text(SIMULATED_KEY, "true")

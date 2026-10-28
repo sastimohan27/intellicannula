@@ -182,3 +182,79 @@ def overlay_png_base64(result: dict) -> str:
 def public(result: dict) -> dict:
     """Result without the private arrays used for drawing."""
     return {k: v for k, v in result.items() if not k.startswith("_")}
+
+
+# --- Baseline-anchored change (candidate method, see scripts/validate_site_monitoring.py) ---
+#
+# The in-photo reference above cancels lighting, but redness that spreads to the
+# far skin raises the reference too and cancels itself: on real limb photos with
+# injected redness it under-measured change by ~16 points. This method compares
+# the follow-up with the BASELINE pixel by pixel instead, after (1) aligning it to
+# the baseline (the homography from the scene check) and (2) mapping its colours
+# onto the baseline's using neutral pixels - sheets, tape, dressing - which are
+# not skin and should not change colour between visits.
+
+NEUTRAL_MAX_SAT = 30
+NEUTRAL_MIN_VALUE = 110
+NEUTRAL_MIN_FRACTION = 0.005
+
+
+def _neutral_mask(bgr: np.ndarray) -> np.ndarray:
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+    return (hsv[..., 1] < NEUTRAL_MAX_SAT) & (hsv[..., 2] > NEUTRAL_MIN_VALUE) & (hsv[..., 2] < 250)
+
+
+def change_vs_baseline(base_bgr: np.ndarray, hub_bbox: list[float], aligned_bgr: np.ndarray) -> dict:
+    """Share of the baseline's ring skin whose a* rose by >= RED_DELTA_A since baseline.
+
+    `aligned_bgr` must already be warped into the baseline's frame (same shape).
+    """
+    if aligned_bgr.shape != base_bgr.shape:
+        raise ValueError("follow-up must be aligned to the baseline frame first")
+    base, hub = _downscale(base_bgr, hub_bbox)
+    follow = cv2.resize(aligned_bgr, (base.shape[1], base.shape[0]), interpolation=cv2.INTER_AREA)
+
+    valid = follow.sum(axis=2) > 0                       # warp leaves black borders
+    # Neutral objects are located in the BASELINE only: a colour cast in the
+    # follow-up can push a white sheet past the saturation limit, and the
+    # photos are aligned, so the same positions hold the same objects.
+    # Clipped follow-up pixels carry no colour information and are excluded.
+    # They must also lie OUTSIDE the measured ring: a transparent dressing over
+    # the site looks white at baseline but reddens with the skin beneath it, and
+    # normalising on it cancelled real change (validation r fell 0.99 -> 0.94).
+    r = _radial_distance(base.shape[:2], hub)
+    neutral = _neutral_mask(base) & valid & (follow.max(axis=2) < 250) & (r >= RING_OUTER)
+    normalised = neutral.mean() >= NEUTRAL_MIN_FRACTION
+    if normalised:
+        gains = base[neutral].astype(np.float64).mean(0) / np.maximum(follow[neutral].astype(np.float64).mean(0), 1)
+        follow = np.clip(follow.astype(np.float64) * gains, 0, 255).astype(np.uint8)
+
+    region = (r >= RING_INNER) & (r < RING_OUTER) & skin_mask(base) & valid
+    if region.sum() < MIN_REF_PIXELS:
+        raise ValueError("Too little skin around the cannula overlaps between the two photos.")
+
+    a_base = cv2.GaussianBlur(cv2.cvtColor(base, cv2.COLOR_BGR2LAB)[..., 1].astype(np.float32), (5, 5), 0)
+    a_follow = cv2.GaussianBlur(cv2.cvtColor(follow, cv2.COLOR_BGR2LAB)[..., 1].astype(np.float32), (5, 5), 0)
+    delta = a_follow - a_base
+    return {
+        "change": float((delta[region] >= RED_DELTA_A).mean()),
+        "colour_normalised": bool(normalised),
+        "neutral_fraction": float(neutral.mean()),
+        "_delta": delta, "_region": region, "_bgr": follow,
+    }
+
+
+def change_overlay_png_base64(change: dict) -> str:
+    """Aligned follow-up with pixels reddened since baseline (Δa* >= threshold) marked."""
+    canvas = change["_bgr"].copy()
+    hit = change["_region"] & (change["_delta"] >= RED_DELTA_A)
+    tint = canvas.copy()
+    tint[hit] = (255, 0, 255)
+    canvas = cv2.addWeighted(canvas, 0.5, tint, 0.5, 0)
+    contours, _ = cv2.findContours(change["_region"].astype(np.uint8), cv2.RETR_EXTERNAL,
+                                   cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(canvas, contours, -1, (255, 255, 0), 1)
+    ok, buffer = cv2.imencode(".png", canvas)
+    if not ok:
+        raise RuntimeError("failed to encode change overlay PNG")
+    return base64.b64encode(buffer.tobytes()).decode("ascii")

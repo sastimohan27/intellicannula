@@ -61,6 +61,10 @@ class SceneMismatch(ValueError):
 class CannulaUnverified(ValueError):
     """Something hub-like was found, but below the verification threshold."""
 
+    def __init__(self, message: str, confidence: float = 0.0):
+        super().__init__(message)
+        self.confidence = confidence
+
 
 class NoCannulaDetected(ValueError):
     """The photo has no detectable cannula hub, so there is no site to score.
@@ -288,50 +292,76 @@ def sample_origin(image_bytes: bytes) -> str:
 def run_site_check(
     image_bytes: bytes, patient_id: int, baseline_bytes: bytes | None
 ) -> dict:
-    """Quality gate -> verified hub -> redness in the skin ring -> baseline comparison.
+    """Quality gate -> cannula -> (baseline) scene check -> redness and change.
 
-    Scoring is `infection_module.src.erythema` (see its docstring for why the
-    LightGBM proxy model was retired from this path). Each photo is measured
-    around its *own* detected hub against skin further out in the *same* photo,
-    so exposure and white balance largely cancel. The baseline is measured the
-    same way and the change is a difference of two measurements.
+    Baseline photo: needs its own verified hub (>= cannula_conf_threshold); its
+    redness is measured against skin further out in the same photo.
 
-    Comparison is refused (SceneMismatch) when the follow-up does not show the
-    same scene as the baseline - otherwise a photo of another patient or site
-    would be scored as a change at this one.
+    Follow-up photo: must show the same scene as the baseline (RANSAC landmark
+    matches), is warped into the baseline frame, and is measured over the
+    baseline's hub region - so every visit covers the same skin. Change since
+    baseline is pixel-wise a* change after colour-matching neutral pixels
+    (`erythema.change_vs_baseline`). On injected-redness validation this
+    replaced a difference of two in-photo measurements, which under-measured
+    change (r 0.59 -> 0.99, see docs/site_monitoring_validation.md).
+
+    A weak detection ("unable to verify", 0.25-0.50) is accepted only on a
+    follow-up that matches a baseline whose hub WAS verified: redder skin
+    lowered detector confidence on 13 of 48 validation follow-ups, so requiring
+    re-detection rejected exactly the most inflamed sites. Nothing hub-like
+    (< 0.25) is always rejected.
     """
     from infection_module.src import erythema
     from infection_module.src.registration import register_images
 
     image = _decode_image(image_bytes)
     quality = check_photo_quality(image)
-    roi_bbox, cannula_confidence, hub = _locate_roi(image)
-    result = erythema.measure(image, hub)
-    current = erythema.public(result)
+    weak: CannulaUnverified | None = None
+    try:
+        roi_bbox, cannula_confidence, hub = _locate_roi(image)
+    except CannulaUnverified as exc:
+        weak, cannula_confidence = exc, exc.confidence
 
     baseline = _baseline_measurement(baseline_bytes) if baseline_bytes else None
-    comparison, inliers, change = "baseline", None, None
-    if baseline_bytes is not None and baseline is None:
-        comparison = "baseline_unusable"
-    elif baseline is not None:
-        _, info = register_images(baseline["image"], image, return_info=True)
+    change_png = None
+    if baseline is None:
+        if weak is not None:
+            raise weak
+        comparison = "baseline_unusable" if baseline_bytes is not None else "baseline"
+        inliers, change, verification = None, None, "detected"
+        result = erythema.measure(image, hub)
+    else:
+        aligned, info = register_images(baseline["image"], image, return_info=True)
         inliers = int(info.get("inliers", 0))
         if inliers < settings.scene_min_inliers:
+            if weak is not None:
+                raise weak
             raise SceneMismatch(
                 "Unable to compare with baseline: this photo does not appear to show the "
                 f"same site as the patient's baseline photo ({inliers} matching landmarks, "
                 f"need {settings.scene_min_inliers}). Check that this is the right patient, "
                 "and photograph the same site from a similar position."
             )
-        comparison = "compared"
-        change = current["reddened_fraction"] - baseline["measurement"]["reddened_fraction"]
+        verification = "detected" if weak is None else "baseline_position"
+        hub, roi_bbox = baseline["hub"], baseline["roi"]
+        result = erythema.measure(aligned, hub)
+        delta = erythema.change_vs_baseline(baseline["image"], hub, aligned)
+        change = delta["change"]
+        change_png = erythema.change_overlay_png_base64(delta)
+        # Without a white/grey object away from the site, a lighting or
+        # white-balance change cannot be separated from redness (validation:
+        # the only false alarm, 1/23, was such a photo). Report the number but
+        # do not call it a change.
+        comparison = "compared" if delta["colour_normalised"] else "no_colour_reference"
 
+    current = erythema.public(result)
     return {
         "risk_score": erythema.risk_score(current["reddened_fraction"]),
         "roi_bbox": roi_bbox,
         "color_distance": current["mean_delta_a"],
         "registration_degraded": False,
         "cannula_confidence": cannula_confidence,
+        "cannula_verification": verification,
         "redness": current,
         "comparison_status": comparison,
         "scene_match_inliers": inliers,
@@ -340,6 +370,7 @@ def run_site_check(
         ),
         "baseline_overlay_png_base64": baseline["overlay"] if baseline is not None else None,
         "change_since_baseline": change,
+        "change_overlay_png_base64": change_png,
         "overlay_png_base64": erythema.overlay_png_base64(result),
         "photo_quality": quality,
         "sample_origin": sample_origin(image_bytes),
@@ -364,10 +395,12 @@ def _baseline_measurement(baseline_bytes: bytes) -> dict | None:
     if key not in _baseline_cache:
         try:
             image = _decode_image(baseline_bytes)
-            _, _, hub = _locate_roi(image)
+            roi, _, hub = _locate_roi(image)
             result = erythema.measure(image, hub)
             _baseline_cache[key] = {
                 "image": image,
+                "hub": hub,
+                "roi": roi,
                 "measurement": erythema.public(result),
                 "overlay": erythema.overlay_png_base64(result),
             }
@@ -418,7 +451,8 @@ def _locate_roi(image: np.ndarray) -> tuple[list[float], float, list[float]]:
             f"Unable to verify the cannula: a possible hub was found (confidence "
             f"{detection['confidence']:.2f}) but it is below the {threshold:.2f} "
             "verification threshold. Retake with the hub centred, in focus and "
-            "not covered by tape."
+            "not covered by tape.",
+            confidence=float(detection["confidence"]),
         )
 
     x1, y1, x2, y2 = detection["bbox"]

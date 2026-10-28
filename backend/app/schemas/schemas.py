@@ -112,9 +112,11 @@ class SiteCheckinOut(BaseModel):
     change_since_baseline: float | None = None
     overlay_png_base64: str | None = None
     baseline_overlay_png_base64: str | None = None
+    change_overlay_png_base64: str | None = None
+    cannula_verification: str | None = None  # detected | baseline_position
     baseline_checkin_id: int | None = None
     baseline_created_at: UTCDateTime | None = None
-    comparison_status: str | None = None     # baseline | compared | baseline_unusable
+    comparison_status: str | None = None     # baseline | compared | no_colour_reference | baseline_unusable
     scene_match_inliers: int | None = None
     assessment_status: str | None = None
     assessment_label: str | None = None

@@ -86,3 +86,39 @@ def test_overlay_is_a_png():
 
     png = base64.b64decode(erythema.overlay_png_base64(erythema.measure(_photo(), HUB)))
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+# --- baseline-anchored change -------------------------------------------------
+
+def _scene() -> np.ndarray:
+    """Skin photo with a white sheet strip (neutral pixels) and a hub."""
+    img = _photo()
+    img[:80, :] = (200, 200, 200)    # light-grey sheet: a colour cast does not clip it
+    return img
+
+
+def test_identical_photos_show_no_change():
+    base = _scene()
+    assert erythema.change_vs_baseline(base, HUB, base.copy())["change"] == 0.0
+
+
+def test_white_balance_shift_is_not_change_when_neutrals_present():
+    base = _scene()
+    warm = np.clip(base.astype(np.float32) * [0.88, 1.0, 1.12], 0, 255).astype(np.uint8)
+    result = erythema.change_vs_baseline(base, HUB, warm)
+    assert result["colour_normalised"]
+    assert result["change"] < 0.02
+
+
+def test_injected_skin_redness_is_measured():
+    base = _scene()
+    skin = erythema.skin_mask(base).astype(np.float32)
+    lab = cv2.cvtColor(base, cv2.COLOR_BGR2LAB).astype(np.float32)
+    lab[..., 1] += 12 * skin        # +12 a* on every skin pixel
+    red = cv2.cvtColor(np.clip(lab, 0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
+    assert erythema.change_vs_baseline(base, HUB, red)["change"] > 0.9
+
+
+def test_unaligned_follow_up_is_refused():
+    with pytest.raises(ValueError, match="aligned"):
+        erythema.change_vs_baseline(_scene(), HUB, _scene()[:500])
